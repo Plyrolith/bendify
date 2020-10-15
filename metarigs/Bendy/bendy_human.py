@@ -1353,7 +1353,7 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['thigh.L']]
-    pbone.rigify_type = 'limbs.super_limb'
+    pbone.rigify_type = 'limbs_bendy.super_limb'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
@@ -1389,15 +1389,15 @@ def create(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.segments = 4
+        pbone.rigify_parameters.segments = 2
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones = 8
+        pbone.rigify_parameters.bbones = 12
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['thigh.R']]
-    pbone.rigify_type = 'limbs.super_limb'
+    pbone.rigify_type = 'limbs_bendy.super_limb'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
@@ -1433,11 +1433,11 @@ def create(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.segments = 4
+        pbone.rigify_parameters.segments = 2
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones = 8
+        pbone.rigify_parameters.bbones = 12
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['spine.002']]
@@ -1585,7 +1585,7 @@ def create(obj):
     pbone.rotation_mode = 'QUATERNION'
     pbone.bone.layers = [False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     pbone = obj.pose.bones[bones['upper_arm.L']]
-    pbone.rigify_type = 'limbs.super_limb'
+    pbone.rigify_type = 'limbs_bendy.super_limb'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
@@ -1617,15 +1617,15 @@ def create(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.segments = 4
+        pbone.rigify_parameters.segments = 2
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones = 8
+        pbone.rigify_parameters.bbones = 12
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['upper_arm.R']]
-    pbone.rigify_type = 'limbs.super_limb'
+    pbone.rigify_type = 'limbs_bendy.super_limb'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
@@ -1657,11 +1657,15 @@ def create(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.segments = 4
+        pbone.rigify_parameters.segments = 2
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones = 8
+        pbone.rigify_parameters.bbones = 12
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.auto_align_extremity = True
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['spine.006']]
