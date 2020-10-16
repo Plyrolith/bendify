@@ -639,13 +639,6 @@ class BaseLimbBendyRig(BaseRig):
         put_bone(self.obj, name, entry.pos)
         return name
 
-    '''
-    @stage.parent_bones
-    def parent_tweak_chain(self):
-       for ctrl, mch in zip(self.bones.ctrl.tweak, self.bones.mch.tweak):
-           self.set_bone_parent(ctrl, mch)
-    '''
-
     @stage.parent_bones
     def parent_tweak_chain(self):
         for args in zip(count(0), self.bones.ctrl.tweak, self.segment_table_tweak):
@@ -670,22 +663,6 @@ class BaseLimbBendyRig(BaseRig):
         tweak_pb.lock_rotation = (False, False, False)
         tweak_pb.lock_scale = (False, False, False)
         tweak_pb.rotation_mode = 'ZXY'
-
-        '''
-        if i > 0 and entry.seg_idx is not None:
-            self.make_rubber_tweak_property(i, tweak, entry)
-        '''
-
-    '''
-    def make_rubber_tweak_property(self, i, tweak, entry):
-        defval = 1.0 if entry.seg_idx else 0.0
-        text = 'Rubber Tweak ({})'.format(strip_org(entry.org))
-
-        self.make_property(tweak, 'rubber_tweak', defval, max=2.0, soft_max=1.0)
-
-        panel = self.script.panel_with_selected_check(self, [tweak])
-        panel.custom_prop(tweak, 'rubber_tweak', text=text, slider=True)
-    '''
 
     @stage.generate_widgets
     def make_tweak_widgets(self):
@@ -717,47 +694,6 @@ class BaseLimbBendyRig(BaseRig):
     def parent_tweak_mch_chain(self):
         for mch, ctrl in zip(self.bones.mch.tweak, self.bones.ctrl.tweak):
             self.set_bone_parent(mch, ctrl)
-
-
-    '''
-    @stage.parent_bones
-    def parent_tweak_mch_chain(self):
-       for args in zip(count(0), self.bones.mch.tweak, self.segment_table_tweak):
-           self.parent_tweak_mch_bone(*args)
-    
-    def parent_tweak_mch_bone(self, i, mch, entry):
-        if i == 0:
-            self.set_bone_parent(mch, self.rig_parent_bone, inherit_scale='FIX_SHEAR')
-        else:
-            self.set_bone_parent(mch, entry.org)
-
-    @stage.rig_bones
-    def rig_tweak_mch_chain(self):
-        for args in zip(count(0), self.bones.mch.tweak, self.segment_table_tweak):
-            self.rig_tweak_mch_bone(*args)
-
-    def rig_tweak_mch_bone(self, i, tweak, entry):
-        if entry.seg_idx:
-            tweaks = self.bones.ctrl.tweak
-            prev_tweak = tweaks[i - entry.seg_idx]
-            next_tweak = tweaks[i + self.segments - entry.seg_idx]
-
-            self.make_constraint(tweak, 'COPY_TRANSFORMS', prev_tweak)
-            self.make_constraint(
-                tweak, 'COPY_TRANSFORMS', next_tweak,
-                influence = entry.seg_idx / self.segments
-            )
-            self.make_constraint(tweak, 'DAMPED_TRACK', next_tweak)
-
-        elif entry.seg_idx is not None:
-            self.make_constraint(tweak, 'COPY_SCALE', 'root', use_make_uniform=True)
-
-        if i == 0:
-            self.make_constraint(tweak, 'COPY_LOCATION', entry.org)
-            self.make_constraint(tweak, 'DAMPED_TRACK', entry.org, head_tail=1)
-        pass
-    '''
-
 
     ####################################################
     # Deform chain
@@ -795,7 +731,6 @@ class BaseLimbBendyRig(BaseRig):
             pbone = self.get_bone(deform)
             pbone.bbone_handle_type_start = 'ABSOLUTE'
             pbone.bbone_handle_type_end = 'ABSOLUTE'
-            ## FIX
             pbone.bbone_custom_handle_start = self.get_bone(tweak_mch)
             pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
 
@@ -803,22 +738,19 @@ class BaseLimbBendyRig(BaseRig):
     def rig_deform_chain(self):
         tweaks = pairwise_nozip(padnone(self.bones.ctrl.tweak))
         entries = pairwise_nozip(padnone(self.segment_table_full))
-        #deform_total = len(self.bones.deform)
 
         for args in zip(count(0), self.bones.deform, *entries, *tweaks):
             self.rig_deform_bone(*args)
 
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         if tweak and not i == len(self.bones.deform) - 1:
-            #self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
             self.make_constraint(deform, 'COPY_LOCATION', tweak)
             self.make_constraint(deform, 'COPY_SCALE', entry.org)
 
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
                 self.make_constraint(deform, 'STRETCH_TO', next_tweak)
-
-                self.rig_deform_easing(i, deform, entry, next_entry, tweak, next_tweak)
+                self.rig_drivers_bendy(i, deform, entry, next_entry, tweak, next_tweak)
 
             elif next_entry:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_entry.org)
@@ -827,15 +759,16 @@ class BaseLimbBendyRig(BaseRig):
         else:
             self.make_constraint(deform, 'COPY_TRANSFORMS', entry.org)
 
-    def rig_deform_easing(self, i, deform, entry, next_entry, tweak, next_tweak):
+    def rig_drivers_bendy(self, i, deform, entry, next_entry, tweak, next_tweak):
         pbone = self.get_bone(deform)
         space = 'LOCAL_SPACE'
         v_type = 'TRANSFORMS'
+        next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
 
         if entry.seg_idx is not None:
-
             ####################################################
             # Easing
+
             expr_in = '' if entry.seg_idx and i > 0 else ' - 1'
             self.make_driver(
                 pbone.bone,
@@ -960,7 +893,120 @@ class BaseLimbBendyRig(BaseRig):
                 }
             )
 
+            ####################################################
+            # Roll
 
+            if entry.seg_idx > 0:
+                if entry.org_idx == 0:
+                    expr_rollin = 'swing_out * ' + str(entry.seg_idx) + ' / ' + str(self.segments) + ' - swing_in * ' + str(self.segments - entry.seg_idx) + ' / ' + str(self.segments)
+                    variables_rollin = {
+                        'swing_out': {
+                            'type': v_type,
+                            'targets':
+                            [
+                                {
+                                    'id': self.obj,
+                                    'bone_target': next_org,
+                                    'transform_type': 'ROT_Y',
+                                    'rotation_mode': 'SWING_TWIST_Y',
+                                    'transform_space': space,
+                                }
+                            ]
+                        },
+                        'swing_in': {
+                            'type': v_type,
+                            'targets':
+                            [
+                                {
+                                    'id': self.obj,
+                                    'bone_target': entry.org,
+                                    'transform_type': 'ROT_Y',
+                                    'rotation_mode': 'SWING_TWIST_Y',
+                                    'transform_space': space,
+                                }
+                            ]
+                        }
+                    }
+                else:
+                    expr_rollin = 'swing_out * ' + str(entry.seg_idx) + ' / ' + str(self.segments)
+                    variables_rollin={
+                        'swing_out': {
+                            'type': v_type,
+                            'targets':
+                            [
+                                {
+                                    'id': self.obj,
+                                    'bone_target': next_org,
+                                    'transform_type': 'ROT_Y',
+                                    'rotation_mode': 'SWING_TWIST_Y',
+                                    'transform_space': space,
+                                }
+                            ]
+                        }
+                    }
+                
+                self.make_driver(
+                    pbone.bone,
+                    'bbone_rollin',
+                    expression=expr_rollin,
+                    variables=variables_rollin
+                )
+
+            if entry.seg_idx < self.segments - 1:
+                if entry.org_idx == 0:
+                    expr_rollout = 'swing_out * ' + str(entry.seg_idx + 1) + ' / ' + str(self.segments) + ' - swing_in * ' + str(self.segments - entry.seg_idx - 1) + ' / ' + str(self.segments)
+                    variables_rollout = {
+                        'swing_out': {
+                            'type': v_type,
+                            'targets':
+                            [
+                                {
+                                    'id': self.obj,
+                                    'bone_target': next_org,
+                                    'transform_type': 'ROT_Y',
+                                    'rotation_mode': 'SWING_TWIST_Y',
+                                    'transform_space': space,
+                                }
+                            ]
+                        },
+                        'swing_in': {
+                            'type': v_type,
+                            'targets':
+                            [
+                                {
+                                    'id': self.obj,
+                                    'bone_target': entry.org,
+                                    'transform_type': 'ROT_Y',
+                                    'rotation_mode': 'SWING_TWIST_Y',
+                                    'transform_space': space,
+                                }
+                            ]
+                        },
+                    }
+                else:
+                    expr_rollout = 'swing_out * ' + str(entry.seg_idx + 1) + ' / ' + str(self.segments)
+                    variables_rollout = {
+                        'swing_out': {
+                            'type': v_type,
+                            'targets':
+                            [
+                                {
+                                    'id': self.obj,
+                                    'bone_target': next_org,
+                                    'transform_type': 'ROT_Y',
+                                    'rotation_mode': 'SWING_TWIST_Y',
+                                    'transform_space': space,
+                                }
+                            ]
+                        }
+                    }
+
+                self.make_driver(
+                    pbone.bone,
+                    'bbone_rollout',
+                    expression=expr_rollout,
+                    variables=variables_rollout
+                )
 
     ####################################################
     # Settings
