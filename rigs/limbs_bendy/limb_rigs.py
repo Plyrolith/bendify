@@ -258,7 +258,7 @@ class BaseLimbBendyRig(BaseRig):
         if parent_mch:
             self.set_bone_parent(ctrl, parent_mch)
         else:
-            self.set_bone_parent(ctrl, prev, use_connect=(i > 0))
+            self.set_bone_parent(ctrl, prev, use_connect=False)
 
     @stage.configure_bones
     def configure_fk_control_chain(self):
