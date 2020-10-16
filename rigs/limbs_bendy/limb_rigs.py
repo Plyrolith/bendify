@@ -190,7 +190,7 @@ class BaseLimbBendyRig(BaseRig):
         bone = self.get_bone(self.bones.ctrl.master)
         bone.lock_location = (True, True, True)
         bone.lock_rotation = (True, True, True)
-        bone.lock_scale = (True, True, True)
+        bone.lock_scale = (False, False, False)
         bone.lock_rotation_w = True
 
     @stage.rig_bones
@@ -270,9 +270,6 @@ class BaseLimbBendyRig(BaseRig):
 
     def configure_fk_control_bone(self, i, ctrl, org):
         self.copy_bone_properties(org, ctrl)
-
-        if i == 2:
-            self.get_bone(ctrl).lock_location = True, True, True
 
     @stage.generate_widgets
     def make_fk_control_widgets(self):
@@ -608,8 +605,10 @@ class BaseLimbBendyRig(BaseRig):
     @stage.parent_bones
     def parent_org_chain(self):
         orgs = self.bones.org.main
-        if len(orgs) > 3:
-            self.get_bone(orgs[3]).use_connect = False
+        for org in orgs:
+            self.get_bone(org).use_connect = False
+        #if len(orgs) > 3:
+        #    self.get_bone(orgs[3]).use_connect = False
 
     @stage.rig_bones
     def rig_org_chain(self):
@@ -672,29 +671,6 @@ class BaseLimbBendyRig(BaseRig):
     def make_tweak_widget(self, tweak):
         create_sphere_widget(self.obj, tweak)
 
-
-    ####################################################
-    # Tweak MCH chain
-
-    @stage.generate_bones
-    def make_tweak_mch_chain(self):
-       self.bones.mch.tweak = map_list(self.make_tweak_mch_bone, count(0), self.segment_table_tweak)
-
-
-    def make_tweak_mch_bone(self, i, entry):
-       name = make_derived_name(entry.org, 'mch', '_tweak')
-       name = self.copy_bone(entry.org, name, scale=1/(4 * self.segments))
-       tweak_mch = self.get_bone(name)
-       pos = entry.pos + tweak_mch.head - tweak_mch.tail
-       put_bone(self.obj, name, pos)
-       return name
-
-
-    @stage.parent_bones
-    def parent_tweak_mch_chain(self):
-        for mch, ctrl in zip(self.bones.mch.tweak, self.bones.ctrl.tweak):
-            self.set_bone_parent(mch, ctrl)
-
     ####################################################
     # Deform chain
 
@@ -722,16 +698,15 @@ class BaseLimbBendyRig(BaseRig):
     
     def parent_deform_chain_easing(self, deform):
         tweaks = pairwise_nozip(padnone(self.bones.ctrl.tweak))
-        tweaks_mch = pairwise_nozip(padnone(self.bones.mch.tweak))
 
-        for args in zip(count(0), self.bones.deform, *tweaks, *tweaks_mch):
+        for args in zip(count(0), self.bones.deform, *tweaks):
             self.parent_deform_easing(*args)
         
-    def parent_deform_easing(self, i, deform, tweak, next_tweak, tweak_mch, next_tweak_mch):
+    def parent_deform_easing(self, i, deform, tweak, next_tweak):
             pbone = self.get_bone(deform)
-            pbone.bbone_handle_type_start = 'ABSOLUTE'
+            pbone.bbone_handle_type_start = 'TANGENT'
             pbone.bbone_handle_type_end = 'ABSOLUTE'
-            pbone.bbone_custom_handle_start = self.get_bone(tweak_mch)
+            pbone.bbone_custom_handle_start = self.get_bone(tweak)
             pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
 
     @stage.rig_bones
@@ -745,7 +720,7 @@ class BaseLimbBendyRig(BaseRig):
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         if tweak and not i == len(self.bones.deform) - 1:
             self.make_constraint(deform, 'COPY_LOCATION', tweak)
-            self.make_constraint(deform, 'COPY_SCALE', entry.org)
+            self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
 
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
