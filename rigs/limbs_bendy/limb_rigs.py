@@ -693,7 +693,7 @@ class BaseLimbBendyRig(BaseRig):
     @stage.parent_bones
     def parent_deform_chain(self):
         self.set_bone_parent(self.bones.deform[0], self.rig_parent_bone)
-        self.parent_bone_chain(self.bones.make_deform_bone)
+        self.parent_bone_chain(self.bones.deform)
         self.parent_deform_chain_easing(self.bones.deform)
     
     def parent_deform_chain_easing(self, deform):
