@@ -703,11 +703,11 @@ class BaseLimbBendyRig(BaseRig):
             self.parent_deform_easing(*args)
         
     def parent_deform_easing(self, i, deform, tweak, next_tweak):
-            pbone = self.get_bone(deform)
-            pbone.bbone_handle_type_start = 'TANGENT'
-            pbone.bbone_handle_type_end = 'ABSOLUTE'
-            pbone.bbone_custom_handle_start = self.get_bone(tweak)
-            pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
+        pbone = self.get_bone(deform)
+        pbone.bbone_handle_type_start = 'TANGENT'
+        pbone.bbone_handle_type_end = 'ABSOLUTE'
+        pbone.bbone_custom_handle_start = self.get_bone(tweak)
+        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
 
     @stage.rig_bones
     def rig_deform_chain(self):
@@ -986,6 +986,10 @@ class BaseLimbBendyRig(BaseRig):
     ####################################################
     # Settings
 
+    @stage.configure_bones
+    def configure_armature_display(self):
+        self.obj.data.display_type = 'BBONE'
+
     @classmethod
     def add_parameters(self, params):
         """ Add the parameters of this rig type to the
@@ -1033,10 +1037,6 @@ class BaseLimbBendyRig(BaseRig):
         # Setting up extra layers for the FK and tweak
         ControlLayersOption.FK.add_parameters(params)
         ControlLayersOption.TWEAK.add_parameters(params)
-    
-    @stage.configure_bones
-    def configure_armature_display(self):
-        self.obj.data.display_type = 'BBONE'
 
     @classmethod
     def parameters_ui(self, layout, params, end='End'):
