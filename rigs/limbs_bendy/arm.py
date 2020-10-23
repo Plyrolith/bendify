@@ -20,122 +20,13 @@
 
 import bpy
 
-from mathutils import Matrix
-
-from rigify.utils.bones import put_bone, compute_chain_x_axis, align_bone_x_axis, align_bone_z_axis
-from rigify.utils.naming import make_derived_name
-from rigify.utils.widgets import adjust_widget_transform_mesh
-
-from rigify.rigs.widgets import create_hand_widget
-from rigify.utils.widgets_basic import create_circle_widget
-
-from rigify.base_rig import stage
-
+from rigify.rigs.limbs.arm import Rig as ArmRig
 from .limb_rigs import BaseLimbBendyRig
 
 
-class Rig(BaseLimbBendyRig):
-    """Human arm rig."""
-
-    def initialize(self):
-        if len(self.bones.org.main) != 3:
-            self.raise_error("Input to rig type must be a chain of 3 bones.")
-
-        super().initialize()
-
-        self.make_wrist_pivot = self.params.make_ik_wrist_pivot
-
-    def prepare_bones(self):
-        orgs = self.bones.org.main
-
-        if self.params.rotation_axis == 'automatic':
-            axis = compute_chain_x_axis(self.obj, orgs[0:2])
-
-            for bone in orgs:
-                align_bone_x_axis(self.obj, bone, axis)
-
-        elif self.params.auto_align_extremity:
-            axis = self.vector_without_z(self.get_bone(orgs[2]).z_axis)
-
-            align_bone_z_axis(self.obj, orgs[2], axis)
-
-    ####################################################
-    # Overrides
-
-    def register_switch_parents(self, pbuilder):
-        super().register_switch_parents(pbuilder)
-
-        pbuilder.register_parent(self, self.bones.org.main[2], exclude_self=True, tags={'limb_end'})
-
-    def make_ik_ctrl_widget(self, ctrl):
-        create_hand_widget(self.obj, ctrl)
-
-    ####################################################
-    # Palm Pivot
-
-    def get_ik_input_bone(self):
-        if self.make_wrist_pivot:
-            return self.bones.mch.ik_wrist
-        else:
-            return self.get_ik_control_output()
-
-    def get_extra_ik_controls(self):
-        controls = super().get_extra_ik_controls()
-        if self.make_wrist_pivot:
-            controls += [self.bones.ctrl.ik_wrist]
-        return controls
-
-    @stage.generate_bones
-    def make_wrist_pivot_control(self):
-        if self.make_wrist_pivot:
-            org = self.bones.org.main[2]
-            self.bones.ctrl.ik_wrist = self.make_wrist_pivot_bone(org)
-            self.bones.mch.ik_wrist = self.copy_bone(org, make_derived_name(org, 'mch', '_ik_wrist'), scale=0.25)
-
-    def make_wrist_pivot_bone(self, org):
-        name = self.copy_bone(org, make_derived_name(org, 'ctrl', '_ik_wrist'), scale=0.5)
-        put_bone(self.obj, name, self.get_bone(org).tail)
-        return name
-
-    @stage.parent_bones
-    def parent_wrist_pivot_control(self):
-        if self.make_wrist_pivot:
-            ctrl = self.bones.ctrl.ik_wrist
-            self.set_bone_parent(ctrl, self.get_ik_control_output())
-            self.set_bone_parent(self.bones.mch.ik_wrist, ctrl)
-
-    @stage.generate_widgets
-    def make_wrist_pivot_widget(self):
-        if self.make_wrist_pivot:
-            ctrl = self.bones.ctrl.ik_wrist
-
-            if self.main_axis == 'x':
-                obj = create_circle_widget(self.obj, ctrl, head_tail=-0.3, head_tail_x=0.5)
-            else:
-                obj = create_circle_widget(self.obj, ctrl, head_tail=0.5, head_tail_x=-0.3)
-
-            if obj:
-                org_bone = self.get_bone(self.bones.org.main[2])
-                offset = org_bone.head - self.get_bone(ctrl).head
-                adjust_widget_transform_mesh(obj, Matrix.Translation(offset))
-
-    ####################################################
-    # Settings
-
-    @classmethod
-    def add_parameters(self, params):
-        super().add_parameters(params)
-
-        params.make_ik_wrist_pivot = bpy.props.BoolProperty(
-            name="IK Wrist Pivot", default=False,
-            description="Make an extra IK hand control pivoting around the tip of the hand"
-        )
-
-    @classmethod
-    def parameters_ui(self, layout, params):
-        layout.prop(params, "make_ik_wrist_pivot")
-
-        super().parameters_ui(layout, params, 'Hand')
+class Rig(BaseLimbBendyRig, ArmRig):
+    """Bendy human arm rig."""
+    pass
 
 
 def create_sample(obj, limb=False):
