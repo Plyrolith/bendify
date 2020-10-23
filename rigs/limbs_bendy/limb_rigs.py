@@ -692,17 +692,24 @@ class BaseLimbBendyRig(BaseRig):
 
     @stage.parent_bones
     def parent_deform_chain(self):
-        self.set_bone_parent(self.bones.deform[0], self.rig_parent_bone)
-        self.parent_bone_chain(self.bones.deform)
-        self.parent_deform_chain_easing(self.bones.deform)
+        for args in zip(count(0), self.bones.ctrl.tweak, self.segment_table_tweak):
+            self.parent_deform_bone(*args)
+
+    def parent_deform_bone(self, i, deform, entry):
+        if i == 0:
+            self.set_bone_parent(deform, self.rig_parent_bone)
+        else:
+            self.set_bone_parent(deform, entry.org)
+
     
-    def parent_deform_chain_easing(self, deform):
+    @stage.parent_bones
+    def rig_deform_chain_easing(self):
         tweaks = pairwise_nozip(padnone(self.bones.ctrl.tweak))
 
         for args in zip(count(0), self.bones.deform, *tweaks):
-            self.parent_deform_easing(*args)
+            self.rig_deform_easing(*args)
         
-    def parent_deform_easing(self, i, deform, tweak, next_tweak):
+    def rig_deform_easing(self, i, deform, tweak, next_tweak):
         pbone = self.get_bone(deform)
         pbone.bbone_handle_type_start = 'TANGENT'
         pbone.bbone_handle_type_end = 'ABSOLUTE'
@@ -721,12 +728,10 @@ class BaseLimbBendyRig(BaseRig):
         if tweak and not i == len(self.bones.deform) - 1:
             self.make_constraint(deform, 'COPY_LOCATION', tweak)
             self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
-
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
                 self.make_constraint(deform, 'STRETCH_TO', next_tweak)
                 self.rig_drivers_bendy(i, deform, entry, next_entry, tweak, next_tweak)
-
             elif next_entry:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_entry.org)
                 self.make_constraint(deform, 'STRETCH_TO', next_entry.org)

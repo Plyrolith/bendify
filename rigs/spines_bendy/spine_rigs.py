@@ -133,10 +133,8 @@ class BaseSpineBendyRig(TweakChainRig):
 
     @stage.parent_bones
     def parent_org_chain(self):
-        ctrl = self.bones.ctrl
-        org = self.bones.org
-        for tweak, org in zip(ctrl.tweak, org):
-            self.set_bone_parent(org, tweak)
+        for org, fk in zip(self.bones.org, self.bones.ctrl.fk):
+            self.set_bone_parent(org, fk)
 
     def rig_org_bone(self, i, org, tweak, next_tweak):
         # For spine rigs, these constraints go on the deform bones. See T74483#902192.
@@ -150,9 +148,42 @@ class BaseSpineBendyRig(TweakChainRig):
         super().configure_tweak_chain()
 
         ControlLayersOption.TWEAK.assign(self.params, self.obj, self.bones.ctrl.tweak)
+        
+        for tweak in self.bones.ctrl.tweak:
+            self.configure_tweak_bone(0, tweak)
+        
+    def configure_tweak_bone(self, i, tweak):
+        tweak_pb = self.get_bone(tweak)
+        tweak_pb.rotation_mode = 'ZXY'
+        tweak_pb.lock_rotation_w = False
+        tweak_pb.lock_rotation = (False, False, False)
+        tweak_pb.lock_scale = (False, False, False)
 
     ####################################################
     # Deform bones
+    @stage.parent_bones
+    def parent_deform_chain(self):
+        for args in zip(count(0), self.bones.deform, self.bones.org):
+            self.parent_deform_bone(*args)
+
+    def parent_deform_bone(self, i, deform, org):
+        if i == 0:
+            self.set_bone_parent(deform, self.rig_parent_bone)
+        else:
+            self.set_bone_parent(deform, org)
+
+    @stage.parent_bones
+    def rig_deform_chain_easing(self):
+        tweaks = self.bones.ctrl.tweak
+        for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
+            self.rig_deform_easing(*args)
+        
+    def rig_deform_easing(self, i, deform, tweak, next_tweak):
+        pbone = self.get_bone(deform)
+        pbone.bbone_handle_type_start = 'TANGENT'
+        pbone.bbone_handle_type_end = 'ABSOLUTE'
+        pbone.bbone_custom_handle_start = self.get_bone(tweak)
+        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
 
     @stage.rig_bones
     def rig_deform_chain(self):
@@ -162,6 +193,7 @@ class BaseSpineBendyRig(TweakChainRig):
 
     def rig_deform_bone(self, i, deform, tweak, next_tweak):
         self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
+        self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
         if next_tweak:
             self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
             self.make_constraint(deform, 'STRETCH_TO', next_tweak)
@@ -274,6 +306,29 @@ class BaseHeadTailBendyRig(ConnectingChainRig):
         super().configure_tweak_chain()
 
         ControlLayersOption.TWEAK.assign(self.params, self.obj, self.bones.ctrl.tweak)
+
+        for tweak in self.bones.ctrl.tweak:
+            tweak_pb = self.get_bone(tweak)
+            tweak_pb.rotation_mode = 'ZXY'
+            tweak_pb.lock_rotation_w = False
+            tweak_pb.lock_rotation = (False, False, False)
+            tweak_pb.lock_scale = (False, False, False)
+
+    ####################################################
+    # Deform bones
+
+    @stage.parent_bones
+    def rig_deform_chain_easing(self):
+        tweaks = self.bones.ctrl.tweak
+        for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
+            self.rig_deform_easing(*args)
+        
+    def rig_deform_easing(self, i, deform, tweak, next_tweak):
+        pbone = self.get_bone(deform)
+        pbone.bbone_handle_type_start = 'TANGENT'
+        pbone.bbone_handle_type_end = 'ABSOLUTE'
+        pbone.bbone_custom_handle_start = self.get_bone(tweak)
+        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
 
     ####################################################
     # Settings

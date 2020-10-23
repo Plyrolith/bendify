@@ -80,16 +80,12 @@ class Rig(BaseHeadTailBendyRig):
 
     @stage.rig_bones
     def rig_control_chain(self):
-        ctrls = self.bones.ctrl.fk
-        for args in zip(count(0), ctrls, [self.bones.ctrl.master] + ctrls):
-            self.rig_control_bone(*args)
-
-    def rig_control_bone(self, i, ctrl, prev_ctrl):
-        self.make_constraint(
-            ctrl, 'COPY_ROTATION', prev_ctrl,
-            use_xyz=self.copy_rotation_axes,
-            space='LOCAL', mix_mode='BEFORE',
-        )
+        for ctrl in self.bones.ctrl.fk:
+            self.make_constraint(
+                ctrl, 'COPY_ROTATION', self.bones.ctrl.master,
+                use_xyz=self.copy_rotation_axes,
+                space='LOCAL', mix_mode='BEFORE',
+            )
 
     # Widgets
     def make_control_widget(self, i, ctrl):
@@ -214,6 +210,10 @@ def create_sample(obj, *, parent=None):
         pass
     try:
         pbone.rigify_parameters.tweak_layers = [False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.copy_rotation_axes = [True, True, True]
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['tail.001']]
