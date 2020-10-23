@@ -22,148 +22,49 @@ import bpy
 
 from itertools import count
 
-from rigify.utils.naming import strip_org, make_derived_name
-from rigify.utils.bones import put_bone, set_bone_widget_transform
-from rigify.utils.widgets_basic import create_circle_widget
-from rigify.utils.misc import map_list
-
+from rigify.utils.layers import ControlLayersOption
 from rigify.base_rig import stage
-
-from rigify.rigs.widgets import create_ballsocket_widget
-
-from .spine_rigs import BaseHeadTailBendyRig
+from rigify.rigs.spines.basic_tail import Rig as TailRig
 
 
-class Rig(BaseHeadTailBendyRig):
-    def initialize(self):
-        super().initialize()
-
-        self.copy_rotation_axes = self.params.copy_rotation_axes
-
-    def parent_bones(self):
-        super().parent_bones()
-
-        if self.connected_tweak and self.use_connect_reverse:
-            self.rig_parent_bone = self.connected_tweak
+class Rig(TailRig):
+    """
+    Head rig with long bendy neck support and connect option.
+    """
 
     ####################################################
-    # Master control
+    # Tweak chain
+ 
+    def configure_tweak_bone(self, i, tweak):
+        # Fully unlocked tweaks
+        tweak_pb = self.get_bone(tweak)
+        tweak_pb.rotation_mode = 'ZXY'
 
-    @stage.generate_bones
-    def make_master_control(self):
-        org = self.bones.org[0]
-        self.bones.ctrl.master = self.copy_bone(org, make_derived_name(org, 'ctrl', '_master'))
-        self.default_prop_bone = self.bones.ctrl.master
+    ####################################################
+    # Deform bones
 
     @stage.parent_bones
-    def parent_master_control(self):
-        self.set_bone_parent(self.bones.ctrl.master, self.rig_parent_bone)
-
-    @stage.configure_bones
-    def configure_master_control(self):
-        bone = self.get_bone(self.bones.ctrl.master)
-        bone.lock_location = True, True, True
-
-    @stage.generate_widgets
-    def make_master_control_widget(self):
-        bone = self.bones.ctrl.master
-        set_bone_widget_transform(self.obj, bone, self.bones.ctrl.tweak[-1])
-        create_ballsocket_widget(self.obj, bone, size=0.7)
-
-    ####################################################
-    # Control bones
-
-    @stage.parent_bones
-    def parent_control_chain(self):
-        self.set_bone_parent(self.bones.ctrl.fk[0], self.bones.mch.rot_tail)
-        self.parent_bone_chain(self.bones.ctrl.fk, use_connect=False)
-
-    @stage.rig_bones
-    def rig_control_chain(self):
-        for ctrl in self.bones.ctrl.fk:
-            self.make_constraint(
-                ctrl, 'COPY_ROTATION', self.bones.ctrl.master,
-                use_xyz=self.copy_rotation_axes,
-                space='LOCAL', mix_mode='BEFORE',
-            )
-
-    # Widgets
-    def make_control_widget(self, i, ctrl):
-        create_circle_widget(self.obj, ctrl, radius=0.5, head_tail=0.75)
-
-    ####################################################
-    # MCH bones associated with main controls
-
-    @stage.generate_bones
-    def make_mch_control_bones(self):
-        self.bones.mch.rot_tail = self.make_mch_follow_bone(self.bones.org[0], 'tail', 0.0)
-
-    @stage.parent_bones
-    def parent_mch_control_bones(self):
-        self.set_bone_parent(self.bones.mch.rot_tail, self.rig_parent_bone)
-
-    ####################################################
-    # Tweak bones
-
-    @stage.generate_bones
-    def make_tweak_chain(self):
-        orgs = self.bones.org
-        self.bones.ctrl.tweak = map_list(self.make_tweak_bone, count(0), orgs[0:1] + orgs)
-
-    def make_tweak_bone(self, i, org):
-        if i == 0:
-            if self.check_connect_tweak(org):
-                return self.connected_tweak
-
-            else:
-                name = self.copy_bone(org, 'tweak_base_' + strip_org(org), parent=False, scale=0.5)
-
-        else:
-            name = self.copy_bone(org, 'tweak_' + strip_org(org), parent=False, scale=0.5)
-            put_bone(self.obj, name, self.get_bone(org).tail)
-
-        return name
-
-    ####################################################
-    # Deform chain
-
-    @stage.configure_bones
-    def configure_deform_chain(self):
-        if self.use_connect_chain and self.use_connect_reverse:
-            self.get_bone(self.bones.deform[-1]).bone.bbone_easein = 0.0
-            self.get_bone(self.rigify_parent.bones.deform[0]).bone.bbone_easein = 1.0
-        else:
-            self.get_bone(self.bones.deform[-1]).bone.bbone_easeout = 0.0
-
+    def rig_deform_chain_easing(self):
+        # New function to set bbone easing in edit mode
+        tweaks = self.bones.ctrl.tweak
+        for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
+            self.rig_deform_easing(*args)
+        
+    def rig_deform_easing(self, i, deform, tweak, next_tweak):
+        # Easing per bone
+        pbone = self.get_bone(deform)
+        pbone.bbone_handle_type_start = 'TANGENT'
+        pbone.bbone_handle_type_end = 'ABSOLUTE'
+        pbone.bbone_custom_handle_start = self.get_bone(tweak)
+        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
 
     ####################################################
     # SETTINGS
-
-    @classmethod
-    def add_parameters(self, params):
-        """ Add the parameters of this rig type to the
-            RigifyParameters PropertyGroup
-        """
-
-        super().add_parameters(params)
-
-        params.copy_rotation_axes = bpy.props.BoolVectorProperty(
-            size=3,
-            description="Automation axes",
-            default=tuple([i == 0 for i in range(0, 3)])
-            )
-
-
-    @classmethod
-    def parameters_ui(self, layout, params):
-        """ Create the ui for the rig parameters.
-        """
-
-        row = layout.row(align=True)
-        for i, axis in enumerate(['x', 'y', 'z']):
-            row.prop(params, "copy_rotation_axes", index=i, toggle=True, text=axis)
-
-        super().parameters_ui(layout, params)
+    
+    @stage.configure_bones
+    def configure_armature_display(self):
+        # New function to set rig viewport display
+        self.obj.data.display_type = 'BBONE'
 
 
 def create_sample(obj, *, parent=None):

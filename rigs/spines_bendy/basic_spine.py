@@ -19,293 +19,229 @@
 # <pep8 compliant>
 
 import bpy
-import math
 
-from itertools import count, repeat
-from mathutils import Matrix
+from itertools import count
 
 from rigify.utils.layers import ControlLayersOption
-from rigify.utils.naming import strip_org, make_mechanism_name, make_derived_name
-from rigify.utils.bones import BoneDict, put_bone, align_bone_to_axis, align_bone_orientation, set_bone_widget_transform
-from rigify.utils.widgets import adjust_widget_transform_mesh
-from rigify.utils.widgets_basic import create_circle_widget
-from rigify.utils.misc import map_list
-
 from rigify.base_rig import stage
-from .spine_rigs import BaseSpineBendyRig
+from rigify.rigs.spines.basic_spine import Rig as SpineRig
 
 
-class Rig(BaseSpineBendyRig):
+class Rig(SpineRig):
     """
-    Spine rig with fixed pivot, hip/chest controls and tweaks.
+    Bendy spine rig with fixed pivot, hip/chest controls and tweaks.
     """
-
-    def initialize(self):
-        super().initialize()
-
-        # Check if user provided the pivot position
-        self.pivot_pos = self.params.pivot_pos
-        self.use_fk = self.params.make_fk_controls
-
-        if not (0 < self.pivot_pos < len(self.bones.org)):
-            self.raise_error("Please specify a valid pivot bone position.")
 
     ####################################################
     # BONES
     #
-    # org[]:
-    #   ORG bones
     # ctrl:
-    #   master, hips, chest:
-    #     Main controls.
-    #   fk:
-    #     chest[], hips[]:
-    #       FK controls.
-    #   tweak[]:
-    #     Tweak control chain.
+    #   master
+    #     Main control.
+    #   master_pivot
+    #     Custom pivot under the master control.
     # mch:
-    #   pivot:
-    #     Pivot tweak parent.
-    #   chain:
-    #     chest[], hips[]:
-    #       Tweak parents, distributing master deform.
-    #   wgt_hips, wgt_chest:
-    #     Widget position bones.
-    # deform[]:
-    #   DEF bones
+    #   master_pivot
+    #     Final output of the custom pivot.
     #
     ####################################################
 
     ####################################################
-    # Master control bone
-
-    def get_master_control_pos(self, orgs):
-        base_bone = self.get_bone(orgs[0])
-        return (base_bone.head + base_bone.tail) / 2
-
-    ####################################################
-    # Main control bones
-
-    @stage.generate_bones
-    def make_end_control_bones(self):
-        orgs = self.bones.org
-        pivot = self.pivot_pos
-
-        self.bones.ctrl.hips = self.make_hips_control_bone(orgs[pivot-1], 'hips')
-        self.bones.ctrl.chest = self.make_chest_control_bone(orgs[pivot], 'chest')
-
-    def make_hips_control_bone(self, org, name):
-        name = self.copy_bone(org, name, parent=False)
-        align_bone_to_axis(self.obj, name, 'y', length=self.length / 4, flip=True)
-        return name
-
-    def make_chest_control_bone(self, org, name):
-        name = self.copy_bone(org, name, parent=False)
-        align_bone_to_axis(self.obj, name, 'y', length=self.length / 3)
-        return name
+    # ORG bones
 
     @stage.parent_bones
-    def parent_end_control_bones(self):
-        ctrl = self.bones.ctrl
-        pivot = self.get_master_control_output()
-        self.set_bone_parent(ctrl.hips, pivot)
-        self.set_bone_parent(ctrl.chest, pivot)
-
-    @stage.generate_widgets
-    def make_end_control_widgets(self):
-        ctrl = self.bones.ctrl
-        mch = self.bones.mch
-        self.make_end_control_widget(ctrl.hips, mch.wgt_hips)
-        self.make_end_control_widget(ctrl.chest, mch.wgt_chest)
-
-    def make_end_control_widget(self, ctrl, wgt_mch):
-        shape_bone = self.get_bone(wgt_mch)
-        is_horizontal = abs(shape_bone.z_axis.normalized().y) < 0.7
-
-        set_bone_widget_transform(self.obj, ctrl, wgt_mch)
-
-        obj = create_circle_widget(
-            self.obj, ctrl,
-            radius=1.2 if is_horizontal else 1.1,
-            head_tail=0.0,
-            head_tail_x=1.0,
-            with_line=False,
-        )
-
-        if is_horizontal:
-            # Tilt the widget toward the ground for horizontal (animal) spines
-            angle = math.copysign(28, shape_bone.x_axis.x)
-            rotmat = Matrix.Rotation(math.radians(angle), 4, 'X')
-            adjust_widget_transform_mesh(obj, rotmat, local=True)
-
-    ####################################################
-    # FK control bones
-
-    @stage.generate_bones
-    def make_control_chain(self):
-        if self.use_fk:
-            orgs = self.bones.org
-            self.bones.ctrl.fk = self.fk_result = BoneDict(
-                hips = map_list(self.make_control_bone, count(0), orgs[0:self.pivot_pos], repeat(True)),
-                chest = map_list(self.make_control_bone, count(self.pivot_pos), orgs[self.pivot_pos:], repeat(False)),
-            )
-
-    def make_control_bone(self, i, org, is_hip):
-        name = self.copy_bone(org, make_derived_name(org, 'ctrl', '_fk'), parent=False)
-        if is_hip:
-            put_bone(self.obj, name, self.get_bone(name).tail)
-        return name
-
-    @stage.parent_bones
-    def parent_control_chain(self):
-        if self.use_fk:
-            chain = self.bones.mch.chain
-            fk = self.bones.ctrl.fk
-            for child, parent in zip(fk.hips, chain.hips):
-                self.set_bone_parent(child, parent)
-            for child, parent in zip(fk.chest, chain.chest):
-                self.set_bone_parent(child, parent)
-
-    @stage.configure_bones
-    def configure_control_chain(self):
-        if self.use_fk:
-            fk = self.bones.ctrl.fk
-            for args in zip(count(0), fk.hips + fk.chest, self.bones.org):
-                self.configure_control_bone(*args)
-
-            ControlLayersOption.FK.assign_rig(self, fk.hips + fk.chest)
-
-    @stage.generate_widgets
-    def make_control_widgets(self):
-        if self.use_fk:
-            fk = self.bones.ctrl.fk
-            for ctrl in fk.hips:
-                self.make_control_widget(ctrl, True)
-            for ctrl in fk.chest:
-                self.make_control_widget(ctrl, False)
-
-    def make_control_widget(self, ctrl, is_hip):
-        obj = create_circle_widget(self.obj, ctrl, radius=1.0, head_tail=0.5)
-        if is_hip:
-            adjust_widget_transform_mesh(obj, Matrix.Diagonal((1, -1, 1, 1)), local=True)
-
-    ####################################################
-    # MCH bones associated with main controls
-
-    @stage.generate_bones
-    def make_mch_control_bones(self):
-        orgs = self.bones.org
-        mch = self.bones.mch
-
-        mch.pivot = self.make_mch_pivot_bone(orgs[self.pivot_pos], 'pivot')
-        mch.wgt_hips = self.make_mch_widget_bone(orgs[0], 'WGT-hips')
-        mch.wgt_chest = self.make_mch_widget_bone(orgs[-1], 'WGT-chest')
-
-    def make_mch_pivot_bone(self, org, name):
-        name = self.copy_bone(org, make_mechanism_name(name), parent=False)
-        align_bone_to_axis(self.obj, name, 'y', length=self.length * 0.6 / 4)
-        return name
-
-    def make_mch_widget_bone(self, org, name):
-        return self.copy_bone(org, make_mechanism_name(name), parent=False)
-
-    @stage.parent_bones
-    def parent_mch_control_bones(self):
-        mch = self.bones.mch
-        fk = self.fk_result
-        self.set_bone_parent(mch.pivot, fk.chest[0])
-        self.set_bone_parent(mch.wgt_hips, fk.hips[0])
-        self.set_bone_parent(mch.wgt_chest, fk.chest[-1])
-        align_bone_orientation(self.obj, mch.pivot, fk.hips[-1])
-
-    @stage.rig_bones
-    def rig_mch_control_bones(self):
-        mch = self.bones.mch
-        self.make_constraint(mch.pivot, 'COPY_TRANSFORMS', self.fk_result.hips[-1], influence=0.5)
-
-    ####################################################
-    # MCH chain for distributing hip & chest transform
-
-    @stage.generate_bones
-    def make_mch_chain(self):
-        orgs = self.bones.org
-        self.bones.mch.chain = BoneDict(
-            hips = map_list(self.make_mch_bone, orgs[0:self.pivot_pos], repeat(True)),
-            chest = map_list(self.make_mch_bone, orgs[self.pivot_pos:], repeat(False)),
-        )
-        if not self.use_fk:
-            self.fk_result = self.bones.mch.chain
-
-    def make_mch_bone(self, org, is_hip):
-        name = self.copy_bone(org, make_mechanism_name(strip_org(org)), parent=False)
-        align_bone_to_axis(self.obj, name, 'y', length=self.length / 10, flip=is_hip)
-        return name
-
-    @stage.parent_bones
-    def parent_mch_chain(self):
-        master = self.get_master_control_output()
-        chain = self.bones.mch.chain
-        fk = self.fk_result
-        for child, parent in zip(reversed(chain.hips), [master, *reversed(fk.hips)]):
-            self.set_bone_parent(child, parent)
-        for child, parent in zip(chain.chest, [master, *fk.chest]):
-            self.set_bone_parent(child, parent)
-
-    @stage.rig_bones
-    def rig_mch_chain(self):
-        ctrl = self.bones.ctrl
-        chain = self.bones.mch.chain
-        for mch in chain.hips:
-            self.rig_mch_bone(mch, ctrl.hips, len(chain.hips))
-        for mch in chain.chest:
-            self.rig_mch_bone(mch, ctrl.chest, len(chain.chest))
-
-    def rig_mch_bone(self, mch, control, count):
-        self.make_constraint(mch, 'COPY_TRANSFORMS', control, space='LOCAL', influence=1/count)
+    def parent_org_chain(self):
+        # Set org parents to ctrl instead of tweak
+        for fk, org in zip(self.bones.ctrl.fk, self.bones.org):
+            self.set_bone_parent(org, fk)
 
     ####################################################
     # Tweak bones
 
+    def configure_tweak_bone(self, i, tweak):
+        # Fully unlocked tweaks
+        tweak_pb = self.get_bone(tweak)
+        tweak_pb.rotation_mode = 'ZXY'
+    
+    ####################################################
+    # Deform bones
     @stage.parent_bones
-    def parent_tweak_chain(self):
-        mch = self.bones.mch
-        chain = self.fk_result
-        parents = [chain.hips[0], *chain.hips[0:-1], mch.pivot, *chain.chest[1:], chain.chest[-1]]
-        for args in zip(self.bones.ctrl.tweak, parents):
-            self.set_bone_parent(*args)
+    def parent_deform_chain(self):
+        # New loop for parenting
+        for args in zip(count(0), self.bones.deform, self.bones.org):
+            self.parent_deform_bone(*args)
+
+    def parent_deform_bone(self, i, deform, org):
+        # New, set deform parent to org
+        if i == 0:
+            self.set_bone_parent(deform, self.bones.ctrl.master)
+        else:
+            self.set_bone_parent(deform, org)
+
+    @stage.parent_bones
+    def rig_deform_chain_easing(self):
+        # New function to set bbone easing in edit mode
+        tweaks = self.bones.ctrl.tweak
+        for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
+            self.rig_deform_easing(*args)
+        
+    def rig_deform_easing(self, i, deform, tweak, next_tweak):
+        # Easing per bone
+        pbone = self.get_bone(deform)
+        pbone.bbone_handle_type_start = 'TANGENT'
+        pbone.bbone_handle_type_end = 'ABSOLUTE'
+        pbone.bbone_custom_handle_start = self.get_bone(tweak)
+        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)    
+
+    def rig_deform_bone(self, i, deform, tweak, next_tweak):
+        # Added copy scale
+        self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
+        self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
+        if next_tweak:
+            self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
+            self.make_constraint(deform, 'STRETCH_TO', next_tweak)
+        self.rig_drivers_bendy(i, deform, tweak, next_tweak)
+
+    def rig_drivers_bendy(self, i, deform, tweak, next_tweak):
+        # New function to create bendy bone drivers
+        pbone = self.get_bone(deform)
+        space = 'LOCAL_SPACE'
+        v_type = 'TRANSFORMS'
+
+        ####################################################
+        # Easing
+
+        #expr_in = ' - 1' if i == 0 else ''
+        self.make_driver(
+            pbone.bone,
+            'bbone_easein',
+            #expression='scale_y' + expr_in,
+            variables={
+                'scale_y': {
+                    'type': v_type,
+                    'targets':
+                    [
+                        {
+                            'id': self.obj,
+                            'bone_target': tweak,
+                            'transform_type': 'SCALE_Y',
+                            'transform_space': space,
+                        }
+                    ]
+                }
+            }
+        )
+
+        #expr_out = ''
+        self.make_driver(
+            pbone.bone,
+            'bbone_easeout',
+            #expression='scale_y' + expr_out,
+            variables={
+                'scale_y': {
+                    'type': v_type,
+                    'targets':
+                    [
+                        {
+                            'id': self.obj,
+                            'bone_target': next_tweak,
+                            'transform_type': 'SCALE_Y',
+                            'transform_space': space,
+                        }
+                    ]
+                }
+            }
+        )
+
+        ####################################################
+        # Scale X
+
+        self.make_driver(
+            pbone.bone,
+            'bbone_scaleinx',
+            variables={
+                'scale_x': {
+                    'type': v_type,
+                    'targets':
+                    [
+                        {
+                            'id': self.obj,
+                            'bone_target': tweak,
+                            'transform_type': 'SCALE_X',
+                            'transform_space': space,
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.make_driver(
+            pbone.bone,
+            'bbone_scaleoutx',
+            variables={
+                'scale_x': {
+                    'type': v_type,
+                    'targets':
+                    [
+                        {
+                            'id': self.obj,
+                            'bone_target': next_tweak,
+                            'transform_type': 'SCALE_X',
+                            'transform_space': space,
+                        }
+                    ]
+                }
+            }
+        )
+
+        ####################################################
+        # Scale Z
+
+        self.make_driver(
+            pbone.bone,
+            'bbone_scaleiny',
+            variables={
+                'scale_z': {
+                    'type': v_type,
+                    'targets':
+                    [
+                        {
+                            'id': self.obj,
+                            'bone_target': tweak,
+                            'transform_type': 'SCALE_Z',
+                            'transform_space': space,
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.make_driver(
+            pbone.bone,
+            'bbone_scaleouty',
+            variables={
+                'scale_z': {
+                    'type': v_type,
+                    'targets':
+                    [
+                        {
+                            'id': self.obj,
+                            'bone_target': next_tweak,
+                            'transform_type': 'SCALE_Z',
+                            'transform_space': space,
+                        }
+                    ]
+                }
+            }
+        )
 
     ####################################################
     # SETTINGS
-
-    @classmethod
-    def add_parameters(self, params):
-        params.pivot_pos = bpy.props.IntProperty(
-            name='pivot_position',
-            default=2,
-            min=0,
-            description='Position of the torso control and pivot point'
-        )
-
-        super().add_parameters(params)
-
-        params.make_fk_controls = bpy.props.BoolProperty(
-            name="FK Controls", default=True,
-            description="Generate an FK control chain"
-        )
-
-        ControlLayersOption.FK.add_parameters(params)
-
-    @classmethod
-    def parameters_ui(self, layout, params):
-        r = layout.row()
-        r.prop(params, "pivot_pos")
-
-        super().parameters_ui(layout, params)
-
-        layout.prop(params, 'make_fk_controls')
-
-        if params.make_fk_controls:
-            ControlLayersOption.FK.parameters_ui(layout, params)
+    
+    @stage.configure_bones
+    def configure_armature_display(self):
+        # New function to set rig viewport display
+        self.obj.data.display_type = 'BBONE'
 
 
 def create_sample(obj):
