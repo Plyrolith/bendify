@@ -146,19 +146,6 @@ class BaseLimbBendyRig(BaseLimbRig):
 
     ####################################################
     # Deform chain
-
-    @stage.parent_bones
-    def parent_deform_chain(self):
-        # Deforms are parented to their orgs
-        for args in zip(count(0), self.bones.deform, self.segment_table_tweak):
-            self.parent_deform_bone(*args)
-
-    def parent_deform_bone(self, i, deform, entry):
-        # New sub loopt function for deform parenting
-        if i == 0:
-            self.set_bone_parent(deform, self.rig_parent_bone)
-        else:
-            self.set_bone_parent(deform, entry.org)
     
     @stage.parent_bones
     def rig_deform_chain_easing(self):
