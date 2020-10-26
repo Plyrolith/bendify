@@ -36,6 +36,8 @@ class Rig(TailRig):
     Bendy tail rig with connect option.
     """
 
+    min_chain_length = 1
+
     def initialize(self):
         # Bbone segments
         super().initialize()
@@ -224,7 +226,7 @@ class Rig(TailRig):
         self.make_driver(
             pbone.bone,
             'bbone_easein',
-            expression='scale_y - 1' if i == 0 else None,
+            #expression='scale_y - 1' if i == 0 else None,
             variables={
                 'scale_y': {
                     'type': v_type,
@@ -241,11 +243,10 @@ class Rig(TailRig):
             }
         )
 
-        #expr_out = ' - 1' if i == 0 else ''
         self.make_driver(
             pbone.bone,
             'bbone_easeout',
-            #expression='scale_y' + expr_out,
+            expression='scale_y - 1' if i == 0 else None,
             variables={
                 'scale_y': {
                     'type': v_type,
