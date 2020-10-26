@@ -54,7 +54,7 @@ class Rig(SuperHeadRig):
         # Easing per bone
         pbone = self.get_bone(deform)
         pbone.bbone_handle_type_start = 'TANGENT'
-        pbone.bbone_handle_type_end = 'ABSOLUTE'
+        pbone.bbone_handle_type_end = 'TANGENT'
         pbone.bbone_custom_handle_start = self.get_bone(tweak)
         pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
 
