@@ -24,9 +24,10 @@ from itertools import count
 
 from rigify.utils.bones import put_bone
 from rigify.utils.layers import ControlLayersOption
-from rigify.utils.naming import strip_org, make_derived_name
+from rigify.utils.naming import make_derived_name
 from rigify.utils.misc import map_list
 from rigify.base_rig import stage
+
 from rigify.rigs.spines.basic_spine import Rig as SpineRig
 
 from ...utils.misc import threewise_nozip
@@ -42,6 +43,8 @@ class Rig(SpineRig):
         super().initialize()
         self.use_fk = True
         self.bbone_segments = self.params.bbones_spine
+        self.volume_variation = self.params.volume_variation
+
 
     ####################################################
     # BONES
@@ -153,7 +156,31 @@ class Rig(SpineRig):
         # Fully unlocked tweaks
         tweak_pb = self.get_bone(tweak)
         tweak_pb.rotation_mode = 'ZXY'
-    
+
+    ##############################
+    # ORG chain
+
+    '''
+    @stage.parent_bones
+    def parent_org_chain(self):
+        mch = self.bones.mch
+        org = self.bones.org
+        for tweak_mch, org in zip(mch.tweak, org):
+            self.set_bone_parent(org, tweak_mch)
+    '''
+
+    @stage.rig_bones
+    def rig_org_chain(self):
+        tweaks = self.bones.ctrl.tweak
+        for args in zip(count(0), self.bones.org, tweaks, tweaks[1:]):
+            self.rig_org_bone(*args)
+
+    def rig_org_bone(self, i, org, tweak, next_tweak):
+        #self.make_constraint(org, 'COPY_TRANSFORMS', tweak)
+        if next_tweak:
+            self.make_constraint(org, 'DAMPED_TRACK', next_tweak)
+            #self.make_constraint(org, 'STRETCH_TO', next_tweak)
+
     ####################################################
     # Deform bones
 
@@ -179,7 +206,7 @@ class Rig(SpineRig):
         self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
         if next_tweak:
             self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
-            self.make_constraint(deform, 'STRETCH_TO', next_tweak)
+            self.make_constraint(deform, 'STRETCH_TO', next_tweak, bulge=self.volume_variation)
         self.rig_drivers_bendy(i, deform, tweak, next_tweak)
 
     def rig_drivers_bendy(self, i, deform, tweak, next_tweak):
@@ -334,6 +361,14 @@ class Rig(SpineRig):
             description = 'Number of B-Bone segments'
         )
 
+        params.volume_variation = bpy.props.FloatProperty(
+            name        = 'Volume Variation',
+            default     = 1.0,
+            min         = 0.0,
+            max         = 100.0,
+            description = 'Volume Variation Factor for Stretch Deform'
+        )
+
     @classmethod
     def parameters_ui(self, layout, params):
         # Removed fk from ui, now always true; adding bbone
@@ -342,6 +377,9 @@ class Rig(SpineRig):
 
         r = layout.row()
         r.prop(params, "bbones_spine")
+
+        r = layout.row()
+        r.prop(params, "volume_variation")
 
         layout.prop(params, 'make_custom_pivot')
 

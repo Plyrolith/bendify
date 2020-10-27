@@ -25,20 +25,16 @@ from itertools import tee
 #=============================================
 
 def threewise_nozip(iterable):
-    "s -> (None,s0,s1), (s0,s1,s2), (s1,s2,s3), ..."
+    "s -> (None,s0,s1), (s0,s1,s2), ... , (sY,sZ,None)"
     prv, c, nxt = tee(iterable, 3)
-    p = [None]
-    p.extend(prv)
-    n = list(nxt)[1:]
-    n.append(None)
+    p = [None] + list(prv)[:-1]
+    n = list(nxt)[1:] + [None]
     return p, c, n
 
 
 def threewise(iterable):
-    "s -> (None,s0,s1), (s0,s1,s2), (s1,s2,s3), ..."
+    "s -> (None,s0,s1), (s0,s1,s2), ... , (sY,sZ,None)"
     prv, c, nxt = tee(iterable, 3)
-    p = [None]
-    p.extend(prv)
-    n = list(nxt)[1:]
-    n.append(None)
+    p = [None] + list(prv)[:-1]
+    n = list(nxt)[1:] + [None]
     return zip(p, c, n)
