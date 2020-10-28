@@ -26,8 +26,10 @@ from rigify.utils.layers import ControlLayersOption
 from rigify.base_rig import stage
 from rigify.rigs.spines.super_head import Rig as SuperHeadRig
 
+from .spine_rigs import BaseBendyHeadTailRig
 
-class Rig(SuperHeadRig):
+
+class Rig(SuperHeadRig, BaseBendyHeadTailRig):
     """
     Head rig with long bendy neck support and connect option.
     """

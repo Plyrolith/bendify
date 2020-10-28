@@ -27,38 +27,45 @@ from rigify.utils.layers import ControlLayersOption
 from rigify.utils.naming import make_derived_name
 from rigify.utils.misc import map_list
 from rigify.base_rig import stage
+from rigify.rigs.widgets import create_gear_widget
 
 from rigify.rigs.spines.basic_spine import Rig as SpineRig
+
+from .spine_rigs import BaseBendyRig
 
 from ...utils.misc import threewise_nozip
 
 
-class Rig(SpineRig):
+class Rig(SpineRig, BaseBendyRig):
     """
     Bendy spine rig with fixed pivot, hip/chest controls and tweaks.
     """
 
-    def initialize(self):
-        # Always use fk, check bbones
-        super().initialize()
-        self.use_fk = True
-        self.bbone_segments = self.params.bbones_spine
-        self.volume_variation = self.params.volume_variation
-
-
     ####################################################
-    # BONES
-    #
-    # ctrl:
-    #   master
-    #     Main control.
-    #   master_pivot
-    #     Custom pivot under the master control.
-    # mch:
-    #   master_pivot
-    #     Final output of the custom pivot.
-    #
-    ####################################################
+    # Volume control
+
+    @stage.generate_bones
+    def make_volume_control(self):
+        org = self.bones.org[self.pivot_pos]
+        self.bones.ctrl.volume = self.copy_bone(org, 'volume')
+        self.copy_scale_bone = self.bones.ctrl.volume
+
+    @stage.parent_bones
+    def parent_volume_control(self):
+        self.set_bone_parent(self.bones.ctrl.volume, self.bones.ctrl.master)
+
+    @stage.configure_bones
+    def configure_volume_control(self):
+        bone = self.get_bone(self.bones.ctrl.volume)
+        bone.lock_location = (True, True, True)
+        bone.lock_rotation = (True, True, True)
+        bone.lock_rotation_w = True
+        bone.lock_scale = (False, True, False)
+
+    @stage.generate_widgets
+    def make_volume_control_widget(self):
+        bone = self.bones.ctrl.volume
+        create_gear_widget(self.obj, bone, size=4)
 
     ####################################################
     # MCH bones associated with main controls
@@ -70,81 +77,26 @@ class Rig(SpineRig):
         self.make_constraint(mch.pivot, 'COPY_LOCATION', self.fk_result.hips[-1], influence=0.5)
 
     ####################################################
-    # Tweak MCH chain
-
-    @stage.generate_bones
-    def make_tweak_mch_chain(self):
-        # Create (new) mch bones for tweaks
-        orgs = self.bones.org
-        self.bones.mch.tweak = map_list(self.make_tweak_mch_bone, count(0), orgs + orgs[-1:])
-
-    def make_tweak_mch_bone(self, i, org):
-        # Tweak mch creation loop
-        name = make_derived_name(org, 'mch', '_tweak')
-        name = self.copy_bone(org, name, parent=False, scale=0.5)
-
-        if i == len(self.bones.org):
-            put_bone(self.obj, name, self.get_bone(org).tail)
-
-        return name
-
-    @stage.parent_bones
-    def parent_tweak_mch_chain(self):
-        # Parent tweak mch to main chain and realign
+    # Tweak Targets
+    
+    def check_mch_parents(self):
         mch = self.bones.mch
         chain = self.fk_result
-        parents = [chain.hips[0], *chain.hips[0:-1], mch.pivot, *chain.chest[1:], chain.chest[-1]]
-        targets = threewise_nozip([mch.tweak[0], *chain.hips[0:-1], mch.pivot, *chain.chest[1:], mch.tweak[-1]])
+        return [chain.hips[0], *chain.hips[0:-1], mch.pivot, *chain.chest[1:], chain.chest[-1]]
 
-        for mch_tweak, parent in zip(mch.tweak, parents):
-            self.set_bone_parent(mch_tweak, parent)
-        
-        for args in zip(mch.tweak, *targets):
-            self.align_tweak_mch_bone(*args)
-    
-    def align_tweak_mch_bone(self, mch, prev_target, curr_target, next_target):
-        # Realign tweak mch
-        if prev_target and next_target:
-            mch_bone = self.get_bone(mch)
-            length = mch_bone.length
-            mch_bone.tail = mch_bone.head + self.get_bone(next_target).head - self.get_bone(prev_target).head
-            mch_bone.length = length
-    
-    @stage.rig_bones
-    def rig_tweak_mch_chain(self):
-        # Create tweak mch constraints
+    def check_mch_targets(self):
         mch = self.bones.mch
         chain = self.fk_result
-        targets = threewise_nozip([mch.tweak[0], *chain.hips[0:-1], mch.pivot, *chain.chest[1:], mch.tweak[-1]])
-
-        for args in zip(mch.tweak, *targets):
-            self.rig_tweak_mch_bone(*args)
-
-    def rig_tweak_mch_bone(self, mch, prev_target, curr_target, next_target):
-        # Constraints to calculate tangent rotation between previous and next chain targets
-        if prev_target and next_target:
-            self.make_constraint(mch, 'COPY_LOCATION', prev_target)
-            self.make_constraint(mch, 'STRETCH_TO', next_target, bulge=0, volume='NO_VOLUME', keep_axis='PLANE_Z')
-            self.make_constraint(mch, 'COPY_LOCATION', curr_target)
-        self.make_constraint(mch, 'COPY_SCALE', self.bones.ctrl.master)        
+        return threewise_nozip([mch.tweak[0], *chain.hips[0:-1], mch.pivot, *chain.chest[1:], mch.tweak[-1]])      
 
     ####################################################
-    # Tweak bones
+    # Tweak chain
 
     @stage.parent_bones
     def parent_tweak_chain(self):
-        # Parent tweaks to their mch bone
-        ctrl = self.bones.ctrl
-        mch = self.bones.mch
-        chain = self.fk_result
-        targets = threewise_nozip([mch.tweak[0], *chain.hips[0:-1], mch.pivot, *chain.chest[1:], mch.tweak[-1]])
-        for tweak, mch in zip(ctrl.tweak, mch.tweak):
-            self.set_bone_parent(tweak, mch)
-        
-        for args in zip(ctrl.tweak, *targets):
-            self.align_tweak_bone(*args)
-    
-    def align_tweak_bone(self, tweak, prev_target, curr_target, next_target):
+        BaseBendyRig.parent_tweak_chain(self)
+
+    def align_tweak_bone(self, i, tweak, prev_target, curr_target, next_target):
         # Realign tweak
         if prev_target and next_target:
             tweak_bone = self.get_bone(tweak)
@@ -153,239 +105,47 @@ class Rig(SpineRig):
             tweak_bone.length = length
 
     def configure_tweak_bone(self, i, tweak):
-        # Fully unlocked tweaks
-        tweak_pb = self.get_bone(tweak)
-        tweak_pb.rotation_mode = 'ZXY'
-
-    ##############################
-    # ORG chain
-
-    '''
-    @stage.parent_bones
-    def parent_org_chain(self):
-        mch = self.bones.mch
-        org = self.bones.org
-        for tweak_mch, org in zip(mch.tweak, org):
-            self.set_bone_parent(org, tweak_mch)
-    '''
-
-    @stage.rig_bones
-    def rig_org_chain(self):
-        tweaks = self.bones.ctrl.tweak
-        for args in zip(count(0), self.bones.org, tweaks, tweaks[1:]):
-            self.rig_org_bone(*args)
-
-    def rig_org_bone(self, i, org, tweak, next_tweak):
-        #self.make_constraint(org, 'COPY_TRANSFORMS', tweak)
-        if next_tweak:
-            self.make_constraint(org, 'DAMPED_TRACK', next_tweak)
-            #self.make_constraint(org, 'STRETCH_TO', next_tweak)
+        BaseBendyRig.configure_tweak_bone(self, i, tweak)
 
     ####################################################
     # Deform bones
 
-    @stage.parent_bones
-    def rig_deform_chain_easing(self):
-        # New function to set bbone easing in edit mode
-        tweaks = self.bones.ctrl.tweak
-        for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
-            self.rig_deform_easing(*args)
-        
-    def rig_deform_easing(self, i, deform, tweak, next_tweak):
-        # Easing per bone
-        pbone = self.get_bone(deform)
-        pbone.bbone_segments = self.bbone_segments
-        pbone.bbone_handle_type_start = 'TANGENT'
-        pbone.bbone_handle_type_end = 'TANGENT'
-        pbone.bbone_custom_handle_start = self.get_bone(tweak)
-        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)    
-
     def rig_deform_bone(self, i, deform, tweak, next_tweak):
-        # Added copy scale
-        self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
-        self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
-        if next_tweak:
-            self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
-            self.make_constraint(deform, 'STRETCH_TO', next_tweak, bulge=self.volume_variation)
-        self.rig_drivers_bendy(i, deform, tweak, next_tweak)
+        BaseBendyRig.rig_deform_bone(self, i, deform, tweak, next_tweak)
 
-    def rig_drivers_bendy(self, i, deform, tweak, next_tweak):
-        # New function to create bendy bone drivers
-        pbone = self.get_bone(deform)
-        space = 'LOCAL_SPACE'
-        v_type = 'TRANSFORMS'
+    @stage.configure_bones
+    def configure_bbone_chain(self):
+        pass
 
-        ####################################################
-        # Easing
+    ##############################
+    # ORG chain
 
-        self.make_driver(
-            pbone.bone,
-            'bbone_easein',
-            expression='scale_y - 1' if i == 0 else None,
-            variables={
-                'scale_y': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': tweak,
-                            'transform_type': 'SCALE_Y',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        #expr_out = ' - 1' if i == 0 else ''
-        self.make_driver(
-            pbone.bone,
-            'bbone_easeout',
-            #expression='scale_y' + expr_out,
-            variables={
-                'scale_y': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': next_tweak,
-                            'transform_type': 'SCALE_Y',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        ####################################################
-        # Scale X
-
-        self.make_driver(
-            pbone.bone,
-            'bbone_scaleinx',
-            variables={
-                'scale_x': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': tweak,
-                            'transform_type': 'SCALE_X',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        self.make_driver(
-            pbone.bone,
-            'bbone_scaleoutx',
-            variables={
-                'scale_x': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': next_tweak,
-                            'transform_type': 'SCALE_X',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        ####################################################
-        # Scale Z
-
-        self.make_driver(
-            pbone.bone,
-            'bbone_scaleiny',
-            variables={
-                'scale_z': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': tweak,
-                            'transform_type': 'SCALE_Z',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        self.make_driver(
-            pbone.bone,
-            'bbone_scaleouty',
-            variables={
-                'scale_z': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': next_tweak,
-                            'transform_type': 'SCALE_Z',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
+    @stage.parent_bones
+    def parent_org_chain(self):
+        ctrl = self.bones.ctrl
+        org = self.bones.org
+        for fk, org in zip(ctrl.fk.hips + ctrl.fk.chest, org):
+            self.set_bone_parent(org, fk)
 
     ####################################################
     # SETTINGS
-    
-    @stage.configure_bones
-    def configure_armature_display(self):
-        # New function to set rig viewport display
-        self.obj.data.display_type = 'BBONE'
-    
-    @classmethod
-    def add_parameters(self, params):
-        # Adding bbone segments
-        super().add_parameters(params)
-
-        params.bbones_spine = bpy.props.IntProperty(
-            name        = 'B-Bone Segments',
-            default     = 8,
-            min         = 1,
-            description = 'Number of B-Bone segments'
-        )
-
-        params.volume_variation = bpy.props.FloatProperty(
-            name        = 'Volume Variation',
-            default     = 1.0,
-            min         = 0.0,
-            max         = 100.0,
-            description = 'Volume Variation Factor for Stretch Deform'
-        )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        # Removed fk from ui, now always true; adding bbone
-        r = layout.row()
-        r.prop(params, "pivot_pos")
-
+        # Added bbone segments
         r = layout.row()
         r.prop(params, "bbones_spine")
+
+        r = layout.row(align=True)
+        r.prop(params, "bbones_easein", text="Ease In", toggle=True)
+        r.prop(params, "bbones_easeout", text="Ease Out", toggle=True)
 
         r = layout.row()
         r.prop(params, "volume_variation")
 
-        layout.prop(params, 'make_custom_pivot')
-
-        ControlLayersOption.TWEAK.parameters_ui(layout, params)
-
-        ControlLayersOption.FK.parameters_ui(layout, params)
+        r = layout.row()
+        r.prop(params, "orgs_rig")
+        super().parameters_ui(layout, params)
 
 
 def create_sample(obj):

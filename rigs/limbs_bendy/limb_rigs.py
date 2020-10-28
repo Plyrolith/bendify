@@ -76,10 +76,9 @@ class BaseLimbBendyRig(BaseLimbRig):
     @stage.configure_bones
     def configure_master_control(self):
         # Unlocked master control scale
+        super().configure_master_control()
         bone = self.get_bone(self.bones.ctrl.master)
-        bone.lock_location = (True, True, True)
-        bone.lock_rotation = (True, True, True)
-        bone.lock_rotation_w = True
+        bone.lock_scale = (False, False, False)
 
     ####################################################
     # FK control chain
@@ -115,11 +114,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             self.parent_tweak_bone(*args)
 
     def parent_tweak_bone(self, i, tweak, entry):
-        # New sub loop function, set tweak parents to org instead of mch
-        if i == 0:
-            self.set_bone_parent(tweak, self.rig_parent_bone, inherit_scale='FIX_SHEAR')
-        else:
-            self.set_bone_parent(tweak, entry.org)
+        super().parent_tweak_mch_bone(i, tweak, entry)
 
     def configure_tweak_bone(self, i, tweak, entry):
         # Completely unlocked tweak
@@ -176,7 +171,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
                 self.make_constraint(deform, 'STRETCH_TO', next_tweak)
-                self.rig_drivers_bendy(i, deform, entry, next_entry, tweak, next_tweak)
+                self.drivers_deform_bone(i, deform, entry, next_entry, tweak, next_tweak)
             elif next_entry:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_entry.org)
                 self.make_constraint(deform, 'STRETCH_TO', next_entry.org)
@@ -184,7 +179,7 @@ class BaseLimbBendyRig(BaseLimbRig):
         else:
             self.make_constraint(deform, 'COPY_TRANSFORMS', entry.org)
 
-    def rig_drivers_bendy(self, i, deform, entry, next_entry, tweak, next_tweak):
+    def drivers_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         # New function to create bendy bone drivers
         pbone = self.get_bone(deform)
         space = 'LOCAL_SPACE'

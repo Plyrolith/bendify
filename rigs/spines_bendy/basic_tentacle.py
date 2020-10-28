@@ -21,9 +21,10 @@
 import bpy
 
 from rigify.base_rig import stage
-from rigify.utils.naming import strip_org, make_derived_name
-from rigify.rigs.widgets import create_ballsocket_widget, create_gear_widget
 from rigify.utils.bones import put_bone, set_bone_widget_transform
+from rigify.utils.naming import strip_org, make_derived_name
+from rigify.utils.widgets_basic import create_circle_widget
+from rigify.rigs.widgets import create_ballsocket_widget, create_gear_widget
 
 from .spine_rigs import ConnectingBendyRig
 
@@ -43,27 +44,25 @@ class Rig(ConnectingBendyRig):
 
     @stage.configure_bones
     def configure_master_control(self):
-        bone = self.get_bone(self.bones.ctrl.master)
-        bone.lock_location = (True, True, True)
-        bone.lock_scale = (False, True, False)
-        if not any(self.copy_rotation_axes):
-            bone.lock_location = (True, True, True)
-            bone.lock_rotation = (True, True, True)
-            bone.lock_rotation_w = True
+        super().configure_master_control()
+        if any(self.copy_rotation_axes):
+            bone = self.get_bone(self.bones.ctrl.master)
+            bone.lock_rotation = (False, False, False)
+            bone.lock_rotation_w = False
 
 
     @stage.generate_widgets
     def make_master_control_widget(self):
-        bone = self.bones.ctrl.master
         if any(self.copy_rotation_axes):
+            bone = self.bones.ctrl.master
             set_bone_widget_transform(self.obj, bone, self.bones.ctrl.tweak[-1])
             create_ballsocket_widget(self.obj, bone, size=0.7)
         else:
-            create_gear_widget(self.obj, bone, size=4)
+            super().make_master_control_widget()
 
     ####################################################
     # Control bones
-
+    
     @stage.rig_bones
     def rig_control_chain(self):
         if any(self.copy_rotation_axes):
@@ -104,11 +103,6 @@ class Rig(ConnectingBendyRig):
             row.prop(params, "copy_rotation_axes", index=i, toggle=True, text=axis)
 
         super().parameters_ui(layout, params)
-
-import bpy
-
-
-from mathutils import Color
 
 
 def create_sample(obj):
