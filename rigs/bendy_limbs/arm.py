@@ -21,7 +21,7 @@
 import bpy
 
 from rigify.rigs.limbs.arm import Rig as ArmRig
-from .limb_rigs import BaseLimbBendyRig
+from .bendy_limb_rigs import BaseLimbBendyRig
 
 
 class Rig(BaseLimbBendyRig, ArmRig):
@@ -58,7 +58,7 @@ def create_sample(obj, limb=False):
 
     bpy.ops.object.mode_set(mode='OBJECT')
     pbone = obj.pose.bones[bones['upper_arm.L']]
-    pbone.rigify_type = 'limbs_bendy.super_limb' if limb else 'limbs_bendy.arm'
+    pbone.rigify_type = 'bendy_limbs.arm'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False

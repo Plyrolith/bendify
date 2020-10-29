@@ -26,7 +26,7 @@ from rigify.utils.naming import strip_org, make_derived_name
 from rigify.utils.widgets_basic import create_circle_widget
 from rigify.rigs.widgets import create_ballsocket_widget, create_gear_widget
 
-from .spine_rigs import ConnectingBendyRig
+from .bendy_chain_rigs import ConnectingBendyRig
 
 from ...utils.misc import threewise_nozip
 
@@ -149,7 +149,7 @@ def create_sample(obj):
 
     bpy.ops.object.mode_set(mode='OBJECT')
     pbone = obj.pose.bones[bones['tentacle']]
-    pbone.rigify_type = 'spines_bendy.basic_tentacle'
+    pbone.rigify_type = 'bendy_chains.tentacle'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False

@@ -20,20 +20,53 @@
 
 import bpy
 
-from rigify.utils.widgets_basic import create_circle_widget
+from itertools import count
 
-from .spine_rigs import BaseBendyHeadTailRig
-from .basic_tentacle import Rig as BasicTentacleRig
+from rigify.utils.layers import ControlLayersOption
+from rigify.base_rig import stage
+from rigify.rigs.spines.super_head import Rig as SuperHeadRig
+
+from .bendy_chain_rigs import BaseBendyHeadTailRig
 
 
-class Rig(BasicTentacleRig, BaseBendyHeadTailRig):
+class Rig(SuperHeadRig, BaseBendyHeadTailRig):
     """
-    Bendy tail rig with connect option.
+    Head rig with long bendy neck support and connect option.
     """
 
-    # Widgets
-    def make_control_widget(self, i, ctrl):
-        create_circle_widget(self.obj, ctrl, radius=0.5, head_tail=0.75)
+    ####################################################
+    # Tweak chain
+ 
+    def configure_tweak_bone(self, i, tweak):
+        # Fully unlocked tweaks
+        tweak_pb = self.get_bone(tweak)
+        tweak_pb.rotation_mode = 'ZXY'
+
+    ####################################################
+    # Deform bones
+
+    @stage.parent_bones
+    def rig_deform_chain_easing(self):
+        # New function to set bbone easing in edit mode
+        tweaks = self.bones.ctrl.tweak
+        for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
+            self.rig_deform_easing(*args)
+        
+    def rig_deform_easing(self, i, deform, tweak, next_tweak):
+        # Easing per bone
+        pbone = self.get_bone(deform)
+        pbone.bbone_handle_type_start = 'TANGENT'
+        pbone.bbone_handle_type_end = 'TANGENT'
+        pbone.bbone_custom_handle_start = self.get_bone(tweak)
+        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
+
+    ####################################################
+    # SETTINGS
+    
+    @stage.configure_bones
+    def configure_armature_display(self):
+        # New function to set rig viewport display
+        self.obj.data.display_type = 'BBONE'
 
 
 def create_sample(obj, *, parent=None):
@@ -43,32 +76,32 @@ def create_sample(obj, *, parent=None):
 
     bones = {}
 
-    bone = arm.edit_bones.new('tail')
-    bone.head[:] = 0.0000, 0.0552, 1.0099
-    bone.tail[:] = -0.0000, 0.0582, 0.8669
+    bone = arm.edit_bones.new('neck')
+    bone.head[:] = 0.0000, 0.0114, 1.6582
+    bone.tail[:] = 0.0000, -0.0130, 1.7197
     bone.roll = 0.0000
     bone.use_connect = False
     if parent:
         bone.parent = arm.edit_bones[parent]
-    bones['tail'] = bone.name
-    bone = arm.edit_bones.new('tail.001')
-    bone.head[:] = -0.0000, 0.0582, 0.8669
-    bone.tail[:] = -0.0000, 0.0365, 0.7674
+    bones['neck'] = bone.name
+    bone = arm.edit_bones.new('neck.001')
+    bone.head[:] = 0.0000, -0.0130, 1.7197
+    bone.tail[:] = 0.0000, -0.0247, 1.7813
     bone.roll = 0.0000
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['tail']]
-    bones['tail.001'] = bone.name
-    bone = arm.edit_bones.new('tail.002')
-    bone.head[:] = -0.0000, 0.0365, 0.7674
-    bone.tail[:] = -0.0000, 0.0010, 0.6984
+    bone.parent = arm.edit_bones[bones['neck']]
+    bones['neck.001'] = bone.name
+    bone = arm.edit_bones.new('head')
+    bone.head[:] = 0.0000, -0.0247, 1.7813
+    bone.tail[:] = 0.0000, -0.0247, 1.9796
     bone.roll = 0.0000
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['tail.001']]
-    bones['tail.002'] = bone.name
+    bone.parent = arm.edit_bones[bones['neck.001']]
+    bones['head'] = bone.name
 
     bpy.ops.object.mode_set(mode='OBJECT')
-    pbone = obj.pose.bones[bones['tail']]
-    pbone.rigify_type = 'spines_bendy.basic_tail'
+    pbone = obj.pose.bones[bones['neck']]
+    pbone.rigify_type = 'bendy_chains.head'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
@@ -82,18 +115,14 @@ def create_sample(obj, *, parent=None):
         pbone.rigify_parameters.tweak_layers = [False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
-    try:
-        pbone.rigify_parameters.copy_rotation_axes = [True, True, True]
-    except AttributeError:
-        pass
-    pbone = obj.pose.bones[bones['tail.001']]
+    pbone = obj.pose.bones[bones['neck.001']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['tail.002']]
+    pbone = obj.pose.bones[bones['head']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)

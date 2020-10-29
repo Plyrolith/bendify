@@ -31,7 +31,7 @@ from rigify.rigs.widgets import create_gear_widget
 
 from rigify.rigs.spines.basic_spine import Rig as SpineRig
 
-from .spine_rigs import BaseBendyRig
+from .bendy_chain_rigs import BaseBendyRig
 
 from ...utils.misc import threewise_nozip
 
@@ -189,7 +189,7 @@ def create_sample(obj):
 
     bpy.ops.object.mode_set(mode='OBJECT')
     pbone = obj.pose.bones[bones['spine']]
-    pbone.rigify_type = 'spines_bendy.basic_spine'
+    pbone.rigify_type = 'bendy_chains.spine'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
