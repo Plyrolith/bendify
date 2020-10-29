@@ -20,8 +20,10 @@
 
 import bpy
 
+from rigify.utils.bones import set_bone_widget_transform
 from rigify.utils.layers import ControlLayersOption
 from rigify.utils.misc import pairwise_nozip, padnone
+from rigify.utils.naming import make_derived_name
 from rigify.base_rig import stage
 from rigify.rigs.limbs.limb_rigs import BaseLimbRig
 
@@ -73,12 +75,35 @@ class BaseLimbBendyRig(BaseLimbRig):
     ####################################################
     # Master control
 
+    @stage.generate_bones
+    def make_master_control(self):
+        org = self.bones.org.main[0]
+        self.bones.ctrl.master = name = self.copy_bone(org, make_derived_name(org, 'ctrl', '_parent'), scale=1/4)
+        self.get_bone(name).roll = 0
+        self.prop_bone = self.bones.ctrl.master
+
+    @stage.parent_bones
+    def parent_master_control(self):
+        self.set_bone_parent(self.bones.ctrl.master, self.bones.mch.follow)
+
+    @stage.rig_bones
+    def rig_master_control(self):
+        ctrl = self.bones.ctrl
+        panel = self.script.panel_with_selected_check(self, ctrl.flatten())
+        self.make_property(ctrl.master, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
+        panel.custom_prop(ctrl.master, 'volume_variation', text='Volume Variation', slider=True)
+
     @stage.configure_bones
     def configure_master_control(self):
         # Unlocked master control scale
         super().configure_master_control()
         bone = self.get_bone(self.bones.ctrl.master)
         bone.lock_scale = (False, False, False)
+    
+    @stage.generate_widgets
+    def make_master_control_widget(self):
+        super().make_master_control_widget()
+        set_bone_widget_transform(self.obj, self.bones.ctrl.master, self.bones.org.main[0])
 
     ####################################################
     # FK control chain
@@ -170,8 +195,8 @@ class BaseLimbBendyRig(BaseLimbRig):
             self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
-                self.make_constraint(deform, 'STRETCH_TO', next_tweak)
-                self.drivers_deform_bone(i, deform, entry, next_entry, tweak, next_tweak)
+                stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
+                self.drivers_deform_bone(i, deform, stretch, entry, next_entry, tweak, next_tweak)
             elif next_entry:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_entry.org)
                 self.make_constraint(deform, 'STRETCH_TO', next_entry.org)
@@ -179,12 +204,17 @@ class BaseLimbBendyRig(BaseLimbRig):
         else:
             self.make_constraint(deform, 'COPY_TRANSFORMS', entry.org)
 
-    def drivers_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
+    def drivers_deform_bone(self, i, deform, stretch, entry, next_entry, tweak, next_tweak):
         # New function to create bendy bone drivers
         pbone = self.get_bone(deform)
         space = 'LOCAL_SPACE'
         v_type = 'TRANSFORMS'
         next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
+
+        ####################################################
+        # Volume Variation
+
+        self.make_driver(pbone.constraints["Stretch To"], 'bulge', variables=[(self.bones.ctrl.master, 'volume_variation')])
 
         if entry.seg_idx is not None:
             ####################################################

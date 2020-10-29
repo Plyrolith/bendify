@@ -47,7 +47,7 @@ class Rig(SpineRig, BaseBendyRig):
     @stage.generate_bones
     def make_volume_control(self):
         org = self.bones.org[self.pivot_pos]
-        self.bones.ctrl.volume = self.copy_bone(org, 'volume')
+        self.bones.ctrl.volume = self.copy_bone(org, 'spine_volume')
         self.copy_scale_bone = self.bones.ctrl.volume
 
     @stage.parent_bones
@@ -126,6 +126,9 @@ class Rig(SpineRig, BaseBendyRig):
         org = self.bones.org
         for fk, org in zip(ctrl.fk.hips + ctrl.fk.chest, org):
             self.set_bone_parent(org, fk)
+    
+    def rig_org_bone(self, i, org, deform):
+        BaseBendyRig.rig_org_bone(self, i, org, deform)
 
     ####################################################
     # SETTINGS
@@ -140,11 +143,6 @@ class Rig(SpineRig, BaseBendyRig):
         r.prop(params, "bbones_easein", text="Ease In", toggle=True)
         r.prop(params, "bbones_easeout", text="Ease Out", toggle=True)
 
-        r = layout.row()
-        r.prop(params, "volume_variation")
-
-        r = layout.row()
-        r.prop(params, "orgs_rig")
         super().parameters_ui(layout, params)
 
 
