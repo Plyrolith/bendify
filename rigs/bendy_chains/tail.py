@@ -20,20 +20,89 @@
 
 import bpy
 
+from rigify.base_rig import stage
 from rigify.utils.widgets_basic import create_circle_widget
 
-from .bendy_chain_rigs import BaseBendyHeadTailRig
 from .tentacle import Rig as BasicTentacleRig
 
 
-class Rig(BasicTentacleRig, BaseBendyHeadTailRig):
+class Rig(BasicTentacleRig):
     """
-    Bendy tail rig with connect option.
+    Bendy tail rig with connect option and rotation switch.
     """
+
+    def initialize(self):
+        super().initialize()
+
+        self.rotation_bones = []
 
     # Widgets
     def make_control_widget(self, i, ctrl):
         create_circle_widget(self.obj, ctrl, radius=0.5, head_tail=0.75)
+
+    ####################################################
+    # Utilities
+
+    def get_parent_master(self, default_bone):
+        """ Return the parent's master control bone if connecting and found. """
+
+        if self.use_incoming_tweak and 'master' in self.rigify_parent.bones.ctrl:
+            return self.rigify_parent.bones.ctrl.master
+        else:
+            return default_bone
+
+    def get_parent_master_panel(self, default_bone):
+        """ Return the parent's master control bone if connecting and found, and script panel. """
+
+        controls = self.bones.ctrl.flatten()
+        prop_bone = self.get_parent_master(default_bone)
+
+        if prop_bone != default_bone:
+            owner = self.rigify_parent
+            controls += self.rigify_parent.bones.ctrl.flatten()
+        else:
+            owner = self
+
+        return prop_bone, self.script.panel_with_selected_check(owner, controls)
+
+    ####################################################
+    # Rotation follow
+
+    def make_mch_follow_bone(self, org, name, defval, *, copy_scale=False):
+        bone = self.copy_bone(org, make_derived_name('ROT-'+name, 'mch'), parent=True)
+        self.rotation_bones.append((org, name, bone, defval, copy_scale))
+        return bone
+
+    @stage.parent_bones
+    def align_mch_follow_bones(self):
+        self.follow_bone = self.get_parent_master('root')
+
+        for org, name, bone, defval, copy_scale in self.rotation_bones:
+            align_bone_orientation(self.obj, bone, self.follow_bone)
+
+    @stage.configure_bones
+    def configure_mch_follow_bones(self):
+        self.prop_bone, panel = self.get_parent_master_panel(self.default_prop_bone)
+
+        for org, name, bone, defval, copy_scale in self.rotation_bones:
+            textname = name.replace('_',' ').title() + ' Follow'
+
+            self.make_property(self.prop_bone, name+'_follow', default=float(defval))
+            panel.custom_prop(self.prop_bone, name+'_follow', text=textname, slider=True)
+
+    @stage.rig_bones
+    def rig_mch_follow_bones(self):
+        for org, name, bone, defval, copy_scale in self.rotation_bones:
+            self.rig_mch_rotation_bone(bone, name+'_follow', copy_scale)
+
+    def rig_mch_rotation_bone(self, mch, prop_name, copy_scale):
+        con = self.make_constraint(mch, 'COPY_ROTATION', self.follow_bone)
+
+        self.make_driver(con, 'influence', variables=[(self.prop_bone, prop_name)], polynomial=[1,-1])
+
+        if copy_scale:
+            self.make_constraint(mch, 'COPY_SCALE', self.follow_bone)
+
 
 
 def create_sample(obj, *, parent=None):

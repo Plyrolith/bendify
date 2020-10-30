@@ -110,8 +110,8 @@ class Rig(SpineRig, BaseBendyRig):
     ####################################################
     # Deform bones
 
-    def rig_deform_bone(self, i, deform, tweak, next_tweak):
-        BaseBendyRig.rig_deform_bone(self, i, deform, tweak, next_tweak)
+    def rig_deform_bone(self, i, deform, tweak, next_tweak, total):
+        BaseBendyRig.rig_deform_bone(self, i, deform, tweak, next_tweak, total)
 
     @stage.configure_bones
     def configure_bbone_chain(self):

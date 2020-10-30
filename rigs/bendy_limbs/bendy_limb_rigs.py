@@ -132,15 +132,6 @@ class BaseLimbBendyRig(BaseLimbRig):
     ####################################################
     # Tweak control chain
 
-    @stage.parent_bones
-    def parent_tweak_chain(self):
-        # Added count to zip and created sub function
-        for args in zip(count(0), self.bones.ctrl.tweak, self.segment_table_tweak):
-            self.parent_tweak_bone(*args)
-
-    def parent_tweak_bone(self, i, tweak, entry):
-        super().parent_tweak_mch_bone(i, tweak, entry)
-
     def configure_tweak_bone(self, i, tweak, entry):
         # Completely unlocked tweak
         tweak_pb = self.get_bone(tweak)
@@ -149,20 +140,15 @@ class BaseLimbBendyRig(BaseLimbRig):
     ####################################################
     # Tweak MCH chain
 
-    @stage.generate_bones
-    def make_tweak_mch_chain(self):
-        # Removed tweak mch
-        pass
-
-    @stage.parent_bones
-    def parent_tweak_mch_chain(self):
-        # Removed tweak mch
-        pass
-
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
-        # Removed tweak mch
-        pass
+        for args in zip(count(0), self.bones.mch.tweak, self.segment_table_tweak):
+            self.rig_tweak_mch_bone(*args)
+
+    def rig_tweak_mch_bone(self, i, tweak, entry):
+        # Removed mechanics, only copy scale
+        if entry.seg_idx is not None:
+            self.make_constraint(tweak, 'COPY_SCALE', self.bones.ctrl.master, use_make_uniform=True)
 
     ####################################################
     # Deform chain
@@ -173,14 +159,14 @@ class BaseLimbBendyRig(BaseLimbRig):
         self.parent_bone_chain(self.bones.deform)
 
     @stage.parent_bones
-    def rig_deform_chain_easing(self):
+    def ease_deform_chain(self):
         # (New) ease settings on edit bones need to bo set in parenting stage
         tweaks = pairwise_nozip(padnone(self.bones.ctrl.tweak))
 
         for args in zip(count(0), self.bones.deform, *tweaks):
-            self.rig_deform_easing(*args)
+            self.ease_deform_bone(*args)
         
-    def rig_deform_easing(self, i, deform, tweak, next_tweak):
+    def ease_deform_bone(self, i, deform, tweak, next_tweak):
         # Sub loop function for bbone easing
         pbone = self.get_bone(deform)
         pbone.bbone_handle_type_start = 'TANGENT'
