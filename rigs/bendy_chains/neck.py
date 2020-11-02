@@ -89,6 +89,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     def check_mch_targets(self):
         return threewise_nozip(self.check_mch_parents())
 
+
     ####################################################
     # Tweak MCH chain
     
@@ -209,6 +210,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         # Optional head DEF
         orgs = self.bones.org if self.create_head_def else self.bones.org[:-1]
         self.bones.deform = map_list(self.make_deform_bone, count(0), orgs)
+        self.bbone_chain_length = len(self.bones.deform) - 1 - self.create_head_def
 
     @stage.generate_bones
     def register_parent_bones(self):
@@ -229,8 +231,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         if self.has_neck:
             tweaks = self.bones.ctrl.tweak
             for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
-                total = self.bones.deform[:-1] if self.create_head_def else self.bones.deform
-                self.rig_deform_bone(*args, total)
+                self.rig_deform_bone(*args)
 
         deforms = self.bones.deform
 
@@ -251,7 +252,6 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         self.make_constraint(bone, 'COPY_SCALE', ctrl)
         self.make_constraint(bone, 'DAMPED_TRACK', ctrl, head_tail=1)
         self.make_constraint(bone, 'STRETCH_TO', ctrl, head_tail=1)
-    
 
     def drivers_deform_roll_bone(self, i, deform, length):
         pbone = self.get_bone(deform)

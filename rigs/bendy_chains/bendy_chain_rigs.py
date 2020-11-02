@@ -48,6 +48,7 @@ class BaseBendyRig(TweakChainRig):
         self.bbone_segments = self.params.bbones_spine
         self.bbone_easein = self.params.bbones_easein
         self.bbone_easeout = self.params.bbones_easeout
+        self.bbone_chain_length = 0
 
         self.keep_axis = 'SWING_Y'
     
@@ -176,7 +177,7 @@ class BaseBendyRig(TweakChainRig):
             self.make_constraint(mch, 'COPY_LOCATION', prev_target)
             self.make_constraint(mch, 'STRETCH_TO', next_target, bulge=0, volume='NO_VOLUME', keep_axis=self.keep_axis)
             self.make_constraint(mch, 'COPY_LOCATION', curr_target)
-        self.make_constraint(mch, 'COPY_SCALE', copy_scale_bone, use_make_uniform=True)
+        self.make_constraint(mch, 'COPY_SCALE', self.copy_scale_bone, use_make_uniform=True)
 
     ####################################################
     # Tweak chain
@@ -241,6 +242,11 @@ class BaseBendyRig(TweakChainRig):
     ####################################################
     # Deform bones
 
+    @stage.generate_bones
+    def make_deform_chain(self):
+        super().make_deform_chain
+        self.bbone_chain_length = len(self.bones.deform) - 1
+
     @stage.parent_bones
     def ease_deform_chain(self):
         # New function to set bbone easing in edit mode
@@ -262,17 +268,16 @@ class BaseBendyRig(TweakChainRig):
     def rig_deform_chain(self):
         tweaks = self.bones.ctrl.tweak
         for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
-            total = self.bones.deform
-            self.rig_deform_bone(*args, total)
+            self.rig_deform_bone(*args)
     
-    def rig_deform_bone(self, i, deform, tweak, next_tweak, total):
+    def rig_deform_bone(self, i, deform, tweak, next_tweak):
         self.make_constraint(deform, 'COPY_LOCATION', tweak)
         self.make_constraint(deform, 'COPY_SCALE', self.copy_scale_bone)
         self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
         stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
-        self.drivers_deform_bone(i, deform, stretch, total, tweak, next_tweak)
+        self.drivers_deform_bone(i, deform, stretch, tweak, next_tweak)
 
-    def drivers_deform_bone(self, i, deform, stretch, total, tweak, next_tweak):
+    def drivers_deform_bone(self, i, deform, stretch, tweak, next_tweak):
         # New function to create bendy bone drivers
         pbone = self.get_bone(deform)
         space = 'LOCAL_SPACE'
@@ -309,7 +314,7 @@ class BaseBendyRig(TweakChainRig):
         self.make_driver(
             pbone.bone,
             'bbone_easeout',
-            expression='scale_y - 1' if i == len(total) - 1 and not self.bbone_easeout else None,
+            expression='scale_y - 1' if i == self.bbone_chain_length and not self.bbone_easeout else None,
             variables={
                 'scale_y': {
                     'type': v_type,
@@ -436,7 +441,7 @@ class BaseBendyRig(TweakChainRig):
 
         params.bbones_easeout = bpy.props.BoolProperty(
             name        = 'B-Bone Ease Out',
-            default     = False,
+            default     = True,
             description = 'B-Bone Easing out for Last Bone of Chain'
         )
 
@@ -532,16 +537,16 @@ class ConnectingBendyRig(BaseBendyRig):
     ####################################################
     # Deform bones
 
-    def rig_deform_bone(self, i, deform, tweak, next_tweak, total):
+    def rig_deform_bone(self, i, deform, tweak, next_tweak):
         if i == 0 and self.incoming_tweak:
             self.make_constraint(deform, 'COPY_LOCATION', tweak)
             self.make_constraint(deform, 'COPY_SCALE', self.copy_scale_bone)
             self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
             stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
             total = self.bones.deform
-            self.drivers_deform_bone(i, deform, stretch, total, self.incoming_tweak, next_tweak)
+            self.drivers_deform_bone(i, deform, stretch, self.incoming_tweak, next_tweak)
         else:
-            super().rig_deform_bone(i, deform, tweak, next_tweak, total)
+            super().rig_deform_bone(i, deform, tweak, next_tweak)
 
     ##############################
     # Settings
