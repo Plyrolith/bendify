@@ -26,7 +26,8 @@ from rigify.base_rig import stage
 from rigify.utils.naming import strip_org, make_derived_name
 from rigify.utils.misc import map_list
 from rigify.utils.layers import ControlLayersOption
-from rigify.utils.bones import put_bone, flip_bone, is_same_position, is_connected_position, set_bone_widget_transform
+from rigify.utils.bones import align_bone_orientation, put_bone, flip_bone, is_same_position, is_connected_position, set_bone_widget_transform
+from rigify.utils.widgets_basic import create_circle_widget
 from rigify.rigs.widgets import create_gear_widget
 
 from rigify.rigs.chain_rigs import TweakChainRig
@@ -50,10 +51,11 @@ class BaseBendyRig(TweakChainRig):
         self.bbone_easeout = self.params.bbones_easeout
         self.bbone_chain_length = 0
 
+        self.stretch_orgs_default = 1.0
         self.keep_axis = 'SWING_Y'
 
     ##############################
-    # Tools
+    # Utilities
 
     def align_bone(self, i, bone, prev_target, curr_target, next_target):
         # Realign bone between to targets
@@ -102,8 +104,8 @@ class BaseBendyRig(TweakChainRig):
         panel = self.script.panel_with_selected_check(self, ctrl.flatten())
         self.make_property(master, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
         panel.custom_prop(master, 'volume_variation', text='Volume Variation', slider=True)
-        self.make_property(master, 'stretch_orgs', default=0.0, description='Stretch ORGs to Tweaks instead of following FK')
-        panel.custom_prop(master, 'stretch_orgs', text='ORGs Follow to DEFs', slider=True)
+        self.make_property(master, 'stretch_orgs', default=self.stretch_orgs_default, description='Stretch ORGs to Tweaks instead of following FK')
+        panel.custom_prop(master, 'stretch_orgs', text='Children Follow Tweaks', slider=True)
 
     @stage.generate_widgets
     def make_master_control_widget(self):
@@ -258,6 +260,8 @@ class BaseBendyRig(TweakChainRig):
         pbone.bbone_handle_type_end = 'TANGENT'
         pbone.bbone_custom_handle_start = self.get_bone(tweak)
         pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
+        pbone.bbone_easein = 0.0
+        pbone.bbone_easeout = 0.0
 
     @stage.rig_bones
     def rig_deform_chain(self):
@@ -287,7 +291,7 @@ class BaseBendyRig(TweakChainRig):
         # Easing
 
         self.make_driver(
-            pbone.bone,
+            pbone,
             'bbone_easein',
             expression='scale_y - 1' if i == 0 and not self.bbone_easein else None,
             variables={
@@ -307,7 +311,7 @@ class BaseBendyRig(TweakChainRig):
         )
 
         self.make_driver(
-            pbone.bone,
+            pbone,
             'bbone_easeout',
             expression='scale_y - 1' if i == self.bbone_chain_length and not self.bbone_easeout else None,
             variables={
@@ -330,7 +334,7 @@ class BaseBendyRig(TweakChainRig):
         # Scale X
 
         self.make_driver(
-            pbone.bone,
+            pbone,
             'bbone_scaleinx',
             variables={
                 'scale_x': {
@@ -349,7 +353,7 @@ class BaseBendyRig(TweakChainRig):
         )
 
         self.make_driver(
-            pbone.bone,
+            pbone,
             'bbone_scaleoutx',
             variables={
                 'scale_x': {
@@ -371,7 +375,7 @@ class BaseBendyRig(TweakChainRig):
         # Scale Z
 
         self.make_driver(
-            pbone.bone,
+            pbone,
             'bbone_scaleiny',
             variables={
                 'scale_z': {
@@ -390,7 +394,7 @@ class BaseBendyRig(TweakChainRig):
         )
 
         self.make_driver(
-            pbone.bone,
+            pbone,
             'bbone_scaleouty',
             variables={
                 'scale_z': {
@@ -493,7 +497,7 @@ class ConnectingBendyRig(BaseBendyRig):
     def check_incoming_tweak(self):
         # Check for nearest Tweak of parent and move first org head there
         first_bone = self.bones.org[0]
-        if self.use_incoming_tweak and self.get_bone(first_bone).parent:
+        if self.use_incoming_tweak and self.get_bone_parent(first_bone):
             parent_tweaks = self.rigify_parent.bones.ctrl.tweak
             delta = distance(self.obj, first_bone, parent_tweaks[0])
             self.incoming_tweak = parent_tweaks[0]
@@ -585,3 +589,81 @@ class ConnectingBendyRig(BaseBendyRig):
 
         super().parameters_ui(layout, params)
 
+
+class RotMechBendyRig(ConnectingBendyRig):
+    """
+    Connecting Bendy rig that can copy or cancel its parent's rotation.
+    """
+
+    def initialize(self):
+        super().initialize()
+
+        self.rotation_bones = []
+
+    # Widgets
+    def make_control_widget(self, i, ctrl):
+        create_circle_widget(self.obj, ctrl, radius=0.5, head_tail=0.75)
+
+    ####################################################
+    # Utilities
+
+    def get_parent_master(self, default_bone):
+        """ Return the parent's master control bone if connecting and found. """
+
+        if self.use_incoming_tweak and 'master' in self.rigify_parent.bones.ctrl:
+            return self.rigify_parent.bones.ctrl.master
+        else:
+            return default_bone
+
+    def get_parent_master_panel(self, default_bone):
+        """ Return the parent's master control bone if connecting and found, and script panel. """
+
+        controls = self.bones.ctrl.flatten()
+        prop_bone = self.get_parent_master(default_bone)
+
+        if prop_bone != default_bone:
+            owner = self.rigify_parent
+            controls += self.rigify_parent.bones.ctrl.flatten()
+        else:
+            owner = self
+
+        return prop_bone, self.script.panel_with_selected_check(owner, controls)
+
+    ####################################################
+    # Rotation follow
+
+    def make_mch_follow_bone(self, org, name, defval, *, copy_scale=False):
+        bone = self.copy_bone(org, make_derived_name('ROT-'+name, 'mch'), parent=True)
+        self.rotation_bones.append((org, name, bone, defval, copy_scale))
+        return bone
+
+    @stage.parent_bones
+    def align_mch_follow_bones(self):
+        #self.follow_bone = self.get_parent_master('root')
+        self.follow_bone = 'root'
+
+        for org, name, bone, defval, copy_scale in self.rotation_bones:
+            align_bone_orientation(self.obj, bone, self.follow_bone)
+
+    @stage.configure_bones
+    def configure_mch_follow_bones(self):
+        self.prop_bone, panel = self.get_parent_master_panel(self.default_prop_bone)
+
+        for org, name, bone, defval, copy_scale in self.rotation_bones:
+            textname = name.replace('_',' ').title() + ' Follow'
+
+            self.make_property(self.prop_bone, name+'_follow', default=defval)
+            panel.custom_prop(self.prop_bone, name+'_follow', text=textname, slider=True)
+
+    @stage.rig_bones
+    def rig_mch_follow_bones(self):
+        for org, name, bone, defval, copy_scale in self.rotation_bones:
+            self.rig_mch_rotation_bone(bone, name+'_follow', copy_scale)
+
+    def rig_mch_rotation_bone(self, mch, prop_name, copy_scale):
+        con = self.make_constraint(mch, 'COPY_ROTATION', self.follow_bone)
+
+        self.make_driver(con, 'influence', variables=[(self.prop_bone, prop_name)], polynomial=[1,-1])
+
+        if copy_scale:
+            self.make_constraint(mch, 'COPY_SCALE', self.follow_bone)

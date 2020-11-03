@@ -41,6 +41,11 @@ class Rig(SpineRig, BaseBendyRig):
     Bendy spine rig with fixed pivot, hip/chest controls and tweaks.
     """
 
+    def initialize(self):
+        super().initialize()
+        
+        self.stretch_orgs_default = 0.0
+
     ####################################################
     # Volume control
 

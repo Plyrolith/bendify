@@ -1,4 +1,5 @@
 # rigify_bendy (Rigify Extension)
+### Version: 1.0 Alpha
 Rigify extension with REAL bendy bone controls and improved metarigs
 
 ![Rigify Bendy Description](/images/rigify_bendy.jpg)

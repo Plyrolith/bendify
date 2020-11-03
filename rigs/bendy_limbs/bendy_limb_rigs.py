@@ -79,7 +79,7 @@ class BaseLimbBendyRig(BaseLimbRig):
         self.keep_axis = 'SWING_Y'
 
     ##############################
-    # Tools
+    # Utilities
 
     def align_bone(self, i, bone, prev_target, curr_target, next_target):
         # Realign bone between to targets
@@ -189,12 +189,6 @@ class BaseLimbBendyRig(BaseLimbRig):
         for args in zip(count(0), self.bones.mch.tweak, self.segment_table_tweak):
             self.rig_tweak_mch_bone(*args)
 
-        tables = [self.segment_table, self.segment_table_end, self.segment_table_full, self.segment_table_tweak]
-        for t in tables:
-            print("____________________")
-            for s in t:
-                print(s)
-
     def rig_tweak_mch_bone(self, i, tweak, entry):
         # Removed mechanics, only copy scale
         if not i == 0 and entry.seg_idx == 0:
@@ -229,6 +223,8 @@ class BaseLimbBendyRig(BaseLimbRig):
         pbone.bbone_handle_type_end = 'TANGENT'
         pbone.bbone_custom_handle_start = self.get_bone(tweak)
         pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
+        pbone.bbone_easein = 0.0
+        pbone.bbone_easeout = 0.0
 
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         # Added copy scale constraint and bendy driver creation, excluded last deform segment
@@ -264,7 +260,7 @@ class BaseLimbBendyRig(BaseLimbRig):
 
             expr_in = '' if entry.seg_idx and i > 0 else ' - 1'
             self.make_driver(
-                pbone.bone,
+                pbone,
                 'bbone_easein',
                 expression='scale_y' + expr_in,
                 variables={
@@ -285,7 +281,7 @@ class BaseLimbBendyRig(BaseLimbRig):
 
             expr_out = '' if next_entry.seg_idx else ' - 1'
             self.make_driver(
-                pbone.bone,
+                pbone,
                 'bbone_easeout',
                 expression='scale_y' + expr_out,
                 variables={
@@ -308,7 +304,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             # Scale X
 
             self.make_driver(
-                pbone.bone,
+                pbone,
                 'bbone_scaleinx',
                 variables={
                     'scale_x': {
@@ -327,7 +323,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             )
 
             self.make_driver(
-                pbone.bone,
+                pbone,
                 'bbone_scaleoutx',
                 variables={
                     'scale_x': {
@@ -349,7 +345,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             # Scale Z
 
             self.make_driver(
-                pbone.bone,
+                pbone,
                 'bbone_scaleiny',
                 variables={
                     'scale_z': {
@@ -368,7 +364,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             )
 
             self.make_driver(
-                pbone.bone,
+                pbone,
                 'bbone_scaleouty',
                 variables={
                     'scale_z': {
@@ -439,7 +435,7 @@ class BaseLimbBendyRig(BaseLimbRig):
                     }
                 
                 self.make_driver(
-                    pbone.bone,
+                    pbone,
                     'bbone_rollin',
                     expression=expr_rollin,
                     variables=variables_rollin
@@ -495,7 +491,7 @@ class BaseLimbBendyRig(BaseLimbRig):
                     }
 
                 self.make_driver(
-                    pbone.bone,
+                    pbone,
                     'bbone_rollout',
                     expression=expr_rollout,
                     variables=variables_rollout

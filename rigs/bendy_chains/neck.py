@@ -79,7 +79,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         mch = self.bones.mch
         ctrl = self.bones.ctrl
         if self.long_neck:
-            parents = mch.chain
+            parents = [mch.tweak[0], *mch.chain, ctrl.head]
         elif self.has_neck:
             parents = [ctrl.neck, mch.stretch, ctrl.head]
         else:
@@ -108,6 +108,21 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
             ctrl = self.bones.ctrl
             for mch_tweak in mch.tweak:
                 self.make_constraint(mch_tweak, 'COPY_SCALE', ctrl.master, use_make_uniform=True) 
+
+    ####################################################
+    # MCH IK chain for the long neck
+
+    @stage.parent_bones
+    def parent_mch_ik_chain(self):
+        if self.long_neck:
+            ik = self.bones.mch.ik
+            self.set_bone_parent(ik[0], self.bones.mch.rot_neck)
+            self.parent_bone_chain(ik, use_connect=True)
+    
+    def rig_mch_ik_bone(self, i, mch, ik_len, head):
+        if i == 0:
+            self.make_constraint(mch, 'COPY_LOCATION', self.bones.ctrl.tweak[0])
+        super().rig_mch_ik_bone(i, mch, ik_len, head)
 
     ####################################################
     # MCH chain for the middle of the neck
@@ -264,7 +279,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
 
         if i > 0:
             self.make_driver(
-                pbone.bone,
+                pbone,
                 'bbone_rollin',
                 expression='swing_out * ' + str(i) + ' / ' + str(length),
                 variables={
@@ -285,7 +300,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
             )
         
         self.make_driver(
-            pbone.bone,
+            pbone,
             'bbone_rollout',
             expression='swing_out * ' + str(i + 1) + ' / ' + str(length),
             variables={
