@@ -96,14 +96,6 @@ class Rig(SpineRig, BaseBendyRig):
     def parent_tweak_chain(self):
         BaseBendyRig.parent_tweak_chain(self)
 
-    def align_tweak_bone(self, i, tweak, prev_target, curr_target, next_target):
-        # Realign tweak
-        if prev_target and next_target:
-            tweak_bone = self.get_bone(tweak)
-            length = tweak_bone.length
-            tweak_bone.tail = tweak_bone.head + self.get_bone(next_target).head - self.get_bone(prev_target).head
-            tweak_bone.length = length
-
     def configure_tweak_bone(self, i, tweak):
         BaseBendyRig.configure_tweak_bone(self, i, tweak)
 

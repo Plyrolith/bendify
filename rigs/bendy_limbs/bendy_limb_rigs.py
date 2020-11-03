@@ -72,6 +72,23 @@ class BaseLimbBendyRig(BaseLimbRig):
     #
     ####################################################
 
+    def initialize(self):
+        # Bbone segments
+        super().initialize()
+        self.tweak_align_default = self.params.tweak_align_default
+        self.keep_axis = 'SWING_Y'
+
+    ##############################
+    # Tools
+
+    def align_bone(self, i, bone, prev_target, curr_target, next_target):
+        # Realign bone between to targets
+        if prev_target and next_target:
+            b = self.get_bone(bone)
+            length = b.length
+            b.tail = b.head + self.get_bone(next_target).head - self.get_bone(prev_target).head
+            b.length = length
+
     ####################################################
     # Master control
 
@@ -88,10 +105,11 @@ class BaseLimbBendyRig(BaseLimbRig):
 
     @stage.rig_bones
     def rig_master_control(self):
-        ctrl = self.bones.ctrl
-        panel = self.script.panel_with_selected_check(self, ctrl.flatten())
-        self.make_property(ctrl.master, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
-        panel.custom_prop(ctrl.master, 'volume_variation', text='Volume Variation', slider=True)
+        panel = self.script.panel_with_selected_check(self, self.bones.ctrl.flatten())
+        self.make_property(self.prop_bone, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
+        panel.custom_prop(self.prop_bone, 'volume_variation', text='Volume Variation', slider=True)
+        self.make_property(self.prop_bone, 'align_joint_tweaks', default=float(self.tweak_align_default))
+        panel.custom_prop(self.prop_bone, 'align_joint_tweaks', text='Align Joint Tweaks', slider=True)
 
     @stage.configure_bones
     def configure_master_control(self):
@@ -132,6 +150,25 @@ class BaseLimbBendyRig(BaseLimbRig):
     ####################################################
     # Tweak control chain
 
+    @stage.parent_bones
+    def parent_tweak_chain(self):
+        for args in zip(count(0), self.bones.ctrl.tweak, self.bones.mch.tweak, self.segment_table_tweak):
+            self.parent_tweak_bone(*args)
+
+    def parent_tweak_bone(self, i, tweak, mch, entry):
+        self.set_bone_parent(tweak, mch)
+        if not i == 0 and entry.seg_idx == 0:
+            prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
+            next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
+            self.align_bone(0, tweak, prev_org, None, next_org)
+
+    def rig_tweak_bone(self, i, tweak, entry):
+        super().rig_tweak_mch_bone(i, tweak, entry)
+        if not i == 0 and entry.seg_idx == 0:
+            prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
+            next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
+            self.align_bone(0, tweak, prev_org, None, next_org)
+
     def configure_tweak_bone(self, i, tweak, entry):
         # Completely unlocked tweak
         tweak_pb = self.get_bone(tweak)
@@ -140,15 +177,34 @@ class BaseLimbBendyRig(BaseLimbRig):
     ####################################################
     # Tweak MCH chain
 
+    def parent_tweak_mch_bone(self, i, tweak, entry):
+        super().parent_tweak_mch_bone(i, tweak, entry)
+        if not i == 0 and entry.seg_idx == 0:
+            prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
+            next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
+            self.align_bone(0, tweak, prev_org, None, next_org)
+
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
         for args in zip(count(0), self.bones.mch.tweak, self.segment_table_tweak):
             self.rig_tweak_mch_bone(*args)
 
+        tables = [self.segment_table, self.segment_table_end, self.segment_table_full, self.segment_table_tweak]
+        for t in tables:
+            print("____________________")
+            for s in t:
+                print(s)
+
     def rig_tweak_mch_bone(self, i, tweak, entry):
         # Removed mechanics, only copy scale
-        if entry.seg_idx is not None:
-            self.make_constraint(tweak, 'COPY_SCALE', self.bones.ctrl.master, use_make_uniform=True)
+        if not i == 0 and entry.seg_idx == 0:
+            prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
+            next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
+            self.make_constraint(tweak, 'COPY_LOCATION', prev_org)
+            align = self.make_constraint(tweak, 'STRETCH_TO', next_org, bulge=0, volume='NO_VOLUME', keep_axis=self.keep_axis)
+            self.make_driver(align, 'influence', variables=[(self.prop_bone, 'align_joint_tweaks')])
+            self.make_constraint(tweak, 'COPY_LOCATION', entry.org)
+        self.make_constraint(tweak, 'COPY_SCALE', self.bones.ctrl.master, use_make_uniform=True)
 
     ####################################################
     # Deform chain
@@ -200,7 +256,7 @@ class BaseLimbBendyRig(BaseLimbRig):
         ####################################################
         # Volume Variation
 
-        self.make_driver(pbone.constraints["Stretch To"], 'bulge', variables=[(self.bones.ctrl.master, 'volume_variation')])
+        self.make_driver(pbone.constraints["Stretch To"], 'bulge', variables=[(self.prop_bone, 'volume_variation')])
 
         if entry.seg_idx is not None:
             ####################################################
@@ -452,3 +508,20 @@ class BaseLimbBendyRig(BaseLimbRig):
     def configure_armature_display(self):
         # New function to set rig viewport display
         self.obj.data.display_type = 'BBONE'
+
+    @classmethod
+    def add_parameters(self, params):
+        super().add_parameters(params)
+
+        params.tweak_align_default = bpy.props.BoolProperty(
+            name='Align Joint Tweaks by Default',
+            default=True,
+            description='Align joint tweaks to interpolate between limb segments. This only affects the default, property can always be animated.'
+        )
+
+    @classmethod
+    def parameters_ui(self, layout, params):
+        r = layout.row()
+        r.prop(params, "tweak_align_default", toggle=True)
+
+        super().parameters_ui(layout, params)

@@ -51,7 +51,18 @@ class BaseBendyRig(TweakChainRig):
         self.bbone_chain_length = 0
 
         self.keep_axis = 'SWING_Y'
-    
+
+    ##############################
+    # Tools
+
+    def align_bone(self, i, bone, prev_target, curr_target, next_target):
+        # Realign bone between to targets
+        if prev_target and next_target:
+            b = self.get_bone(bone)
+            length = b.length
+            b.tail = b.head + self.get_bone(next_target).head - self.get_bone(prev_target).head
+            b.length = length
+
     ##############################
     # Control chain
 
@@ -151,15 +162,7 @@ class BaseBendyRig(TweakChainRig):
         targets = self.check_mch_targets()
         
         for args in zip(count(0), mch.tweak, *targets):
-            self.align_tweak_mch_bone(*args)
-
-    def align_tweak_mch_bone(self, i, mch, prev_target, curr_target, next_target):
-        # Realign tweak mch
-        if prev_target and next_target:
-            mch_bone = self.get_bone(mch)
-            length = mch_bone.length
-            mch_bone.tail = mch_bone.head + self.get_bone(next_target).head - self.get_bone(prev_target).head
-            mch_bone.length = length
+            self.align_bone(*args)
     
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
@@ -199,15 +202,7 @@ class BaseBendyRig(TweakChainRig):
         targets = self.check_mch_targets()
         
         for args in zip(count(0), ctrl.tweak, *targets):
-            self.align_tweak_bone(*args)   
-
-    def align_tweak_bone(self, i, tweak, prev_target, curr_target, next_target):
-        # Realign tweak
-        if prev_target and next_target:
-            tweak_bone = self.get_bone(tweak)
-            length = tweak_bone.length
-            tweak_bone.tail = tweak_bone.head + self.get_bone(next_target).head - self.get_bone(prev_target).head
-            tweak_bone.length = length
+            self.align_bone(*args)   
 
     @stage.configure_bones
     def configure_tweak_chain(self):
@@ -244,7 +239,7 @@ class BaseBendyRig(TweakChainRig):
 
     @stage.generate_bones
     def make_deform_chain(self):
-        super().make_deform_chain
+        super().make_deform_chain()
         self.bbone_chain_length = len(self.bones.deform) - 1
 
     @stage.parent_bones
@@ -467,6 +462,7 @@ class ConnectingBendyRig(BaseBendyRig):
         super().initialize()
 
         self.use_incoming_tweak = self.params.incoming_tweak
+        self.incoming_align = self.params.incoming_align
         self.incoming_tweak = None
 
     def prepare_bones(self):
@@ -506,6 +502,17 @@ class ConnectingBendyRig(BaseBendyRig):
                 if dist < delta:
                     delta = dist
                     self.incoming_tweak = tweak
+            
+            # Align
+            if self.incoming_tweak and self.incoming_align and len(parent_tweaks) > 1:
+                tweak = self.bones.ctrl.tweak
+                if self.incoming_tweak == parent_tweaks[0]:
+                    self.align_bone(0, self.incoming_tweak, tweak[1], None, parent_tweaks[1])
+                    self.align_bone(0, tweak[0], parent_tweaks[1], None, tweak[1])
+                elif self.incoming_tweak == parent_tweaks[-1]:
+                    self.align_bone(0, self.incoming_tweak, parent_tweaks[-2], None, tweak[1])
+                    self.align_bone(0, tweak[0], parent_tweaks[-2], None, tweak[1])
+            
             # Dirty way to make sure mch is properly parented
             self.parent_tweak_mch_bone(0, self.bones.mch.tweak[0], self.incoming_tweak)
     
@@ -561,10 +568,20 @@ class ConnectingBendyRig(BaseBendyRig):
             description='Connect the B-Bone chain to the nearest parent tweak'
         )
 
+        params.incoming_align = bpy.props.BoolProperty(
+            name='Align Parent Tweak',
+            default=False,
+            description='Align nearest parent tweak to make the bridging B-Bone curve smoother (only activate for one connection at a time!)'
+        )
+
     @classmethod
     def parameters_ui(self, layout, params):
         r = layout.row()
-        r.prop(params, "incoming_tweak")
+        r.prop(params, "incoming_tweak", toggle=True)
+        r = layout.row()
+        r.prop(params, "incoming_align")
+        if not params.incoming_tweak:
+            r.enabled = False
 
         super().parameters_ui(layout, params)
 
