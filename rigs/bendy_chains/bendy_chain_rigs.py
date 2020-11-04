@@ -533,7 +533,7 @@ class ConnectingBendyRig(BaseBendyRig):
 
     def make_tweak_widget(self, i, tweak):
         if i == 0 and self.incoming_tweak:
-            create_sub_tweak_widget(self.obj, tweak)
+            create_sub_tweak_widget(self.obj, tweak, size=0.25)
         else:
             super().make_tweak_widget(tweak)
 
