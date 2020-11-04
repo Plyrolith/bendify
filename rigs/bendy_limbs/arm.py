@@ -20,12 +20,12 @@
 
 import bpy
 
-from rigify.rigs.limbs.paw import Rig as PawRig
-from .limb_rigs import BaseLimbBendyRig
+from rigify.rigs.limbs.arm import Rig as ArmRig
+from .bendy_limb_rigs import BaseLimbBendyRig
 
 
-class Rig(BaseLimbBendyRig, PawRig):
-    """Bendy Paw rig."""
+class Rig(BaseLimbBendyRig, ArmRig):
+    """Bendy human arm rig."""
     pass
 
 
@@ -36,79 +36,57 @@ def create_sample(obj):
 
     bones = {}
 
-    bone = arm.edit_bones.new('thigh.L')
-    bone.head[:] = 0.0000, 0.0017, 0.7379
-    bone.tail[:] = 0.0000, -0.0690, 0.4731
-    bone.roll = 0.0000
+    bone = arm.edit_bones.new('upper_arm.L')
+    bone.head = -0.0016, 0.0060, -0.0012
+    bone.tail = 0.2455, 0.0678, -0.1367
+    bone.roll = 2.0724
     bone.use_connect = False
-    bones['thigh.L'] = bone.name
-    bone = arm.edit_bones.new('shin.L')
-    bone.head[:] = 0.0000, -0.0690, 0.4731
-    bone.tail[:] = 0.0000, 0.1364, 0.2473
-    bone.roll = 0.0000
+    bones['upper_arm.L'] = bone.name
+    bone = arm.edit_bones.new('forearm.L')
+    bone.head = 0.2455, 0.0678, -0.1367
+    bone.tail = 0.4625, 0.0285, -0.2797
+    bone.roll = 2.1535
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['thigh.L']]
-    bones['shin.L'] = bone.name
-    bone = arm.edit_bones.new('foot.L')
-    bone.head[:] = 0.0000, 0.1364, 0.2473
-    bone.tail[:] = 0.0000, 0.0736, 0.0411
-    bone.roll = -0.0002
+    bone.parent = arm.edit_bones[bones['upper_arm.L']]
+    bones['forearm.L'] = bone.name
+    bone = arm.edit_bones.new('hand.L')
+    bone.head = 0.4625, 0.0285, -0.2797
+    bone.tail = 0.5265, 0.0205, -0.3273
+    bone.roll = 2.2103
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['shin.L']]
-    bones['foot.L'] = bone.name
-    bone = arm.edit_bones.new('toe.L')
-    bone.head[:] = 0.0000, 0.0736, 0.0411
-    bone.tail[:] = 0.0000, -0.0594, 0.0000
-    bone.roll = -3.1416
-    bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['foot.L']]
-    bones['toe.L'] = bone.name
+    bone.parent = arm.edit_bones[bones['forearm.L']]
+    bones['hand.L'] = bone.name
 
     bpy.ops.object.mode_set(mode='OBJECT')
-    pbone = obj.pose.bones[bones['thigh.L']]
-    pbone.rigify_type = 'limbs_bendy.paw'
+    pbone = obj.pose.bones[bones['upper_arm.L']]
+    pbone.rigify_type = 'bendy_limbs.arm'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
     try:
-        pbone.rigify_parameters.fk_layers = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.fk_layers = [False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
-    try:
-        pbone.rigify_parameters.limb_type = "paw"
-    except AttributeError:
-        pass
-    pbone = obj.pose.bones[bones['shin.L']]
+    pbone = obj.pose.bones[bones['forearm.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['foot.L']]
+    pbone = obj.pose.bones[bones['hand.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['toe.L']]
-    pbone.rigify_type = ''
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    try:
-        pbone.rigify_parameters.limb_type = "paw"
-    except AttributeError:
-        pass
 
     bpy.ops.object.mode_set(mode='EDIT')
     for bone in arm.edit_bones:
@@ -120,4 +98,8 @@ def create_sample(obj):
         bone.select = True
         bone.select_head = True
         bone.select_tail = True
+        bone.bbone_x = bone.bbone_z = bone.length * 0.05
         arm.edit_bones.active = bone
+
+    return bones
+    

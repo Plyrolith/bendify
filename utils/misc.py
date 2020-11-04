@@ -18,45 +18,23 @@
 
 # <pep8 compliant>
 
-import bpy
+from itertools import tee
 
-from rigify.base_generate import SubstitutionRig
+#=============================================
+# Iterators
+#=============================================
 
-from .limb_rigs import BaseLimbBendyRig
-
-from . import arm, leg, paw
-
-
-RIGS = { 'arm': arm.Rig, 'leg': leg.Rig, 'paw': paw.Rig }
-
-
-class Rig(SubstitutionRig):
-    def substitute(self):
-        return [ self.instantiate_rig(RIGS[self.params.limb_type], self.base_bone) ]
+def threewise_nozip(iterable):
+    "s -> (None,s0,s1), (s0,s1,s2), ... , (sY,sZ,None)"
+    prv, c, nxt = tee(iterable, 3)
+    p = [None] + list(prv)[:-1]
+    n = list(nxt)[1:] + [None]
+    return p, c, n
 
 
-def add_parameters(params):
-    items = [
-        ('arm', 'Arm', ''),
-        ('leg', 'Leg', ''),
-        ('paw', 'Paw', '')
-    ]
-
-    params.limb_type = bpy.props.EnumProperty(
-        items   = items,
-        name    = "Limb Type",
-        default = 'arm'
-    )
-
-    BaseLimbBendyRig.add_parameters(params)
-
-
-def parameters_ui(layout, params):
-    r = layout.row()
-    r.prop(params, "limb_type")
-
-    RIGS[params.limb_type].parameters_ui(layout, params)
-
-
-def create_sample(obj):
-    arm.create_sample(obj, limb=True)
+def threewise(iterable):
+    "s -> (None,s0,s1), (s0,s1,s2), ... , (sY,sZ,None)"
+    prv, c, nxt = tee(iterable, 3)
+    p = [None] + list(prv)[:-1]
+    n = list(nxt)[1:] + [None]
+    return zip(p, c, n)
