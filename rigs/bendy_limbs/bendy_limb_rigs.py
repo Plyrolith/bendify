@@ -212,19 +212,20 @@ class BaseLimbBendyRig(BaseLimbRig):
     def ease_deform_chain(self):
         # (New) ease settings on edit bones need to bo set in parenting stage
         tweaks = pairwise_nozip(padnone(self.bones.ctrl.tweak))
+        entries = pairwise_nozip(padnone(self.segment_table_full))
 
-        for args in zip(count(0), self.bones.deform, *tweaks):
+        for args in zip(count(0), self.bones.deform, *tweaks, *entries):
             self.ease_deform_bone(*args)
         
-    def ease_deform_bone(self, i, deform, tweak, next_tweak):
+    def ease_deform_bone(self, i, deform, tweak, next_tweak, entry, next_entry):
         # Sub loop function for bbone easing
         pbone = self.get_bone(deform)
         pbone.bbone_handle_type_start = 'TANGENT'
         pbone.bbone_handle_type_end = 'TANGENT'
         pbone.bbone_custom_handle_start = self.get_bone(tweak)
         pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
-        pbone.bbone_easein = 0.0
-        pbone.bbone_easeout = 0.0
+        pbone.bbone_easein = 1.0 if entry.seg_idx and i > 0 else 0.0
+        pbone.bbone_easeout = 1.0 if next_entry and next_entry.seg_idx else 0.0
 
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         # Added copy scale constraint and bendy driver creation, excluded last deform segment
@@ -258,11 +259,10 @@ class BaseLimbBendyRig(BaseLimbRig):
             ####################################################
             # Easing
 
-            expr_in = '' if entry.seg_idx and i > 0 else ' - 1'
             self.make_driver(
                 pbone,
                 'bbone_easein',
-                expression='scale_y' + expr_in,
+                expression='scale_y - 1',
                 variables={
                     'scale_y': {
                         'type': v_type,
@@ -279,11 +279,10 @@ class BaseLimbBendyRig(BaseLimbRig):
                 }
             )
 
-            expr_out = '' if next_entry.seg_idx else ' - 1'
             self.make_driver(
                 pbone,
                 'bbone_easeout',
-                expression='scale_y' + expr_out,
+                expression='scale_y - 1',
                 variables={
                     'scale_y': {
                         'type': v_type,

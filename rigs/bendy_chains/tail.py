@@ -37,7 +37,7 @@ class Rig(RotMechBendyRig, BasicTentacleRig):
     @stage.parent_bones
     def parent_control_chain(self):
         super().parent_control_chain()
-        self.set_bone_parent(self.bones.ctrl.fk[0], self.bones.mch.rot_tail, inherit_scale='FIX?')
+        self.set_bone_parent(self.bones.ctrl.fk[0], self.bones.mch.rot_tail, inherit_scale='FIX_SHEAR')
 
     ####################################################
     # MCH bones associated with main controls
