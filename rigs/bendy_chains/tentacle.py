@@ -37,7 +37,7 @@ class Rig(ConnectingBendyRig):
     def initialize(self):
         super().initialize()
 
-        self.copy_rotation_axes = self.params.copy_rotation_axes
+        self.master_copy_rotation = self.params.master_copy_rotation
 
     ####################################################
     # Master control
@@ -45,7 +45,7 @@ class Rig(ConnectingBendyRig):
     @stage.configure_bones
     def configure_master_control(self):
         super().configure_master_control()
-        if any(self.copy_rotation_axes):
+        if self.master_copy_rotation:
             bone = self.get_bone(self.bones.ctrl.master)
             bone.lock_rotation = (False, False, False)
             bone.lock_rotation_w = False
@@ -53,7 +53,7 @@ class Rig(ConnectingBendyRig):
 
     @stage.generate_widgets
     def make_master_control_widget(self):
-        if any(self.copy_rotation_axes):
+        if self.master_copy_rotation:
             bone = self.bones.ctrl.master
             set_bone_widget_transform(self.obj, bone, self.bones.ctrl.tweak[-1])
             create_ballsocket_widget(self.obj, bone, size=0.7)
@@ -65,14 +65,10 @@ class Rig(ConnectingBendyRig):
     
     @stage.rig_bones
     def rig_control_chain(self):
-        if any(self.copy_rotation_axes):
+        if self.master_copy_rotation:
             ctrls = self.bones.ctrl.fk
             for ctrl in ctrls:
-                self.make_constraint(
-                    ctrl, 'COPY_ROTATION', self.bones.ctrl.master,
-                    use_xyz=self.copy_rotation_axes,
-                    space='LOCAL', mix_mode='BEFORE',
-                )
+                self.make_constraint(ctrl, 'COPY_ROTATION', self.bones.ctrl.master, space='LOCAL', mix_mode='BEFORE')
     
     ####################################################
     # SETTINGS
@@ -85,10 +81,10 @@ class Rig(ConnectingBendyRig):
 
         super().add_parameters(params)
 
-        params.copy_rotation_axes = bpy.props.BoolVectorProperty(
-            size=3,
-            description="Automation axes",
-            default=tuple([i == 0 for i in range(0, 3)])
+        params.master_copy_rotation = bpy.props.BoolProperty(
+            name="Create Master Rotation Control",
+            description="Turn the master controller into a rotation master to control the whole chain at once",
+            default=False
             )
 
 
@@ -97,10 +93,7 @@ class Rig(ConnectingBendyRig):
         """ Create the ui for the rig parameters.
         """
 
-        layout.row().label(text="Master Rotation Control")
-        row = layout.row(align=True)
-        for i, axis in enumerate(['x', 'y', 'z']):
-            row.prop(params, "copy_rotation_axes", index=i, toggle=True, text=axis)
+        layout.row().prop(params, "master_copy_rotation", toggle=True)
 
         super().parameters_ui(layout, params)
 
@@ -155,12 +148,21 @@ def create_sample(obj):
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
+    pbone.bone.layers = [True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     try:
-        pbone.rigify_parameters.bbones_easeout = True
+        pbone.rigify_parameters.bbones_easeout = False
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.copy_rotation_axes = [False, False, False]
+        pbone.rigify_parameters.master_copy_rotation = False
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.bbones_easein = True
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['tentacle.001']]
@@ -170,6 +172,7 @@ def create_sample(obj):
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
+    pbone.bone.layers = [True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     pbone = obj.pose.bones[bones['tentacle.002']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
@@ -177,6 +180,7 @@ def create_sample(obj):
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
+    pbone.bone.layers = [True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     pbone = obj.pose.bones[bones['tentacle.003']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
@@ -184,6 +188,7 @@ def create_sample(obj):
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
+    pbone.bone.layers = [True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     pbone = obj.pose.bones[bones['tentacle.004']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
@@ -191,6 +196,7 @@ def create_sample(obj):
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
+    pbone.bone.layers = [True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
 
     bpy.ops.object.mode_set(mode='EDIT')
     for bone in arm.edit_bones:
@@ -205,7 +211,6 @@ def create_sample(obj):
         bone.bbone_x = bone.bbone_z = bone.length * 0.05
         arm.edit_bones.active = bone
 
-    return bones
+    arm.layers = [(x in [0]) for x in range(32)]
 
-if __name__ == "__main__":
-    create_sample(bpy.context.active_object)
+    return bones

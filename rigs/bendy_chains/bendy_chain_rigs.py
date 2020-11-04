@@ -51,7 +51,7 @@ class BaseBendyRig(TweakChainRig):
         self.bbone_easeout = self.params.bbones_easeout
         self.bbone_chain_length = 0
 
-        self.stretch_orgs_default = 1.0
+        #self.stretch_orgs_default = 1.0
         self.keep_axis = 'SWING_Y'
 
     ##############################
@@ -71,7 +71,7 @@ class BaseBendyRig(TweakChainRig):
     @stage.parent_bones
     def parent_control_chain(self):
         # Disconnect controls
-        self.parent_bone_chain(self.bones.ctrl.fk, use_connect=False)
+        self.parent_bone_chain(self.bones.ctrl.fk, use_connect=False, inherit_scale='ALIGNED')
 
     ####################################################
     # Master control
@@ -104,8 +104,8 @@ class BaseBendyRig(TweakChainRig):
         panel = self.script.panel_with_selected_check(self, ctrl.flatten())
         self.make_property(master, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
         panel.custom_prop(master, 'volume_variation', text='Volume Variation', slider=True)
-        self.make_property(master, 'stretch_orgs', default=self.stretch_orgs_default, description='Stretch ORGs to Tweaks instead of following FK')
-        panel.custom_prop(master, 'stretch_orgs', text='Children Follow Tweaks', slider=True)
+        #self.make_property(master, 'stretch_orgs', default=self.stretch_orgs_default, description='Stretch ORGs to Tweaks instead of following FK')
+        #panel.custom_prop(master, 'stretch_orgs', text='Children Follow Tweaks', slider=True)
 
     @stage.generate_widgets
     def make_master_control_widget(self):
@@ -221,20 +221,22 @@ class BaseBendyRig(TweakChainRig):
     # ORG chain
 
     @stage.parent_bones
-    def parent_org_chain(self):
+    def parent_org_chain(self):  
+        orgs = self.bones.org
         ctrl = self.bones.ctrl
-        org = self.bones.org
-        for fk, org in zip(ctrl.fk, org):
-            self.set_bone_parent(org, fk)
+        for org, tweak in zip(orgs, ctrl.tweak):
+            self.set_bone_parent(org, tweak, inherit_scale='NONE')
 
     @stage.rig_bones
     def rig_org_chain(self):
-        for args in zip(count(0), self.bones.org, self.bones.deform):
-            self.rig_org_bone(*args)
+        for args in zip(count(0), self.bones.org):
+            self.rig_org_bone(*args, self.rig_parent_bone)
 
-    def rig_org_bone(self, i, org, deform):
-        con = self.make_constraint(org, 'COPY_TRANSFORMS', deform)
-        self.make_driver(con, 'influence', variables=[(self.bones.ctrl.master, 'stretch_orgs')])
+    def rig_org_bone(self, i, org, target):
+        self.make_constraint(org, 'COPY_SCALE', target)
+        #con = self.make_constraint(org, 'COPY_TRANSFORMS', deform)
+        #self.make_driver(con, 'influence', variables=[(self.bones.ctrl.master, 'stretch_orgs')])
+        pass
 
     ####################################################
     # Deform bones
@@ -265,13 +267,14 @@ class BaseBendyRig(TweakChainRig):
 
     @stage.rig_bones
     def rig_deform_chain(self):
-        tweaks = self.bones.ctrl.tweak
-        for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
+        ctrl = self.bones.ctrl
+        for args in zip(count(0), self.bones.deform, ctrl.tweak, ctrl.tweak[1:], ctrl.fk):
             self.rig_deform_bone(*args)
     
-    def rig_deform_bone(self, i, deform, tweak, next_tweak):
+    def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
         self.make_constraint(deform, 'COPY_LOCATION', tweak)
-        self.make_constraint(deform, 'COPY_SCALE', self.copy_scale_bone)
+        self.make_constraint(deform, 'COPY_SCALE', fk)
+        self.make_constraint(deform, 'COPY_SCALE', self.copy_scale_bone, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
         self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
         stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
         self.drivers_deform_bone(i, deform, stretch, tweak, next_tweak)
@@ -468,6 +471,7 @@ class ConnectingBendyRig(BaseBendyRig):
         self.use_incoming_tweak = self.params.incoming_tweak
         self.incoming_align = self.params.incoming_align
         self.incoming_tweak = None
+        self.incoming_tweak_mch = None
 
     def prepare_bones(self):
         # Exactly match bone position to parent
@@ -498,7 +502,8 @@ class ConnectingBendyRig(BaseBendyRig):
         # Check for nearest Tweak of parent and move first org head there
         first_bone = self.bones.org[0]
         if self.use_incoming_tweak and self.get_bone_parent(first_bone):
-            parent_tweaks = self.rigify_parent.bones.ctrl.tweak
+            parent = self.rigify_parent
+            parent_tweaks = parent.bones.ctrl.tweak
             delta = distance(self.obj, first_bone, parent_tweaks[0])
             self.incoming_tweak = parent_tweaks[0]
             for tweak in parent_tweaks:
@@ -507,8 +512,13 @@ class ConnectingBendyRig(BaseBendyRig):
                     delta = dist
                     self.incoming_tweak = tweak
             
+            # Get incoming tweak mch, if existing
+            if hasattr(parent.bones, 'mch') and hasattr(parent.bones.mch, 'tweak'):
+                if self.get_bone_parent(self.incoming_tweak) in parent.bones.mch.tweak:
+                    self.incoming_tweak_mch = self.get_bone_parent(self.incoming_tweak)
+            
             # Align
-            if self.incoming_tweak and self.incoming_align and len(parent_tweaks) > 1:
+            if self.incoming_tweak and self.incoming_tweak_mch and self.incoming_align and len(parent_tweaks) > 1:
                 tweak = self.bones.ctrl.tweak
                 if self.incoming_tweak == parent_tweaks[0]:
                     self.align_bone(0, self.incoming_tweak, tweak[1], None, parent_tweaks[1])
@@ -516,9 +526,6 @@ class ConnectingBendyRig(BaseBendyRig):
                 elif self.incoming_tweak == parent_tweaks[-1]:
                     self.align_bone(0, self.incoming_tweak, parent_tweaks[-2], None, tweak[1])
                     self.align_bone(0, tweak[0], parent_tweaks[-2], None, tweak[1])
-            
-            # Dirty way to make sure mch is properly parented
-            self.parent_tweak_mch_bone(0, self.bones.mch.tweak[0], self.incoming_tweak)
     
     @stage.generate_widgets
     def make_tweak_widgets(self):
@@ -536,28 +543,29 @@ class ConnectingBendyRig(BaseBendyRig):
     ####################################################
     # Tweak MCH chain
 
-    def parent_tweak_mch_bone(self, i, mch, parent):
-        if i == 0 and self.incoming_tweak:
+    @stage.apply_bones
+    def parent_tweak_mch_connected(self):
+        # Re-parent first tweak mch to incoming tweak
+        if self.incoming_tweak:
+            mch = self.bones.mch.tweak[0]
             self.set_bone_parent(mch, self.incoming_tweak)
             self.get_bone(mch).inherit_scale = 'NONE'
             self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
-        else:
-            super().parent_tweak_mch_bone(i, mch, parent)
-
 
     ####################################################
     # Deform bones
 
-    def rig_deform_bone(self, i, deform, tweak, next_tweak):
+    def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
         if i == 0 and self.incoming_tweak:
             self.make_constraint(deform, 'COPY_LOCATION', tweak)
-            self.make_constraint(deform, 'COPY_SCALE', self.copy_scale_bone)
+            self.make_constraint(deform, 'COPY_SCALE', fk)
+            self.make_constraint(deform, 'COPY_SCALE', self.copy_scale_bone, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
             self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
             stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
             total = self.bones.deform
             self.drivers_deform_bone(i, deform, stretch, self.incoming_tweak, next_tweak)
         else:
-            super().rig_deform_bone(i, deform, tweak, next_tweak)
+            super().rig_deform_bone(i, deform, tweak, next_tweak, fk)
 
     ##############################
     # Settings

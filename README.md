@@ -1,6 +1,11 @@
 # rigify_bendy (Rigify Extension)
-### Version: 1.0 Alpha
+
 Rigify extension with REAL bendy bone controls and improved metarigs
+
+### Version: 1.0 Beta
+
+These rigs are under development! Don't use in a production environment.
+**ALWAYS** keep your metarigs so you can update broken rigs or change them back to the equivalent built-in rigify samples.
 
 ![Rigify Bendy Description](/images/rigify_bendy.jpg)
 
@@ -16,6 +21,10 @@ This extension adds limbs to Rigify that work exactly like the built-in modules,
 * That's it!
 
 To use the rigs, either change existing Rig types from "limb.[...]" to "limb_bendy.[...]" or start adding new samples to a fresh rig.
+
+Make sure you check out the additional sample properties (and their descriptions)!
+
+![Rigify Bendy Properties](/images/rigify_bendy_properties.png)
 
 ### Super quick start:
 > Add > Armature > Bendy > Bendy Human
@@ -41,6 +50,7 @@ Their rotation and scaling now fully drive the bendy properties of the Deform bo
 
 ## Development
 
-I'm open for testing & feedback! I'm planning on adding the same functionality for the Tail & Spine module, as well as a simple Bendy Bone Tentacle.
-Lastly I'm working on a new facial rig making full use of our beloved Bendies. My goal is to extend Rigify to be that tiny step closer to my own feature film quality needs.
+I'm open for testing & feedback!
+On the roadmap are more tentacle types and a bendy facial rig.
+My goal is to extend Rigify to be that tiny step closer to my own feature film quality needs.
 Stay tuned!
