@@ -104,8 +104,6 @@ class BaseBendyRig(TweakChainRig):
         panel = self.script.panel_with_selected_check(self, ctrl.flatten())
         self.make_property(master, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
         panel.custom_prop(master, 'volume_variation', text='Volume Variation', slider=True)
-        #self.make_property(master, 'stretch_orgs', default=self.stretch_orgs_default, description='Stretch ORGs to Tweaks instead of following FK')
-        #panel.custom_prop(master, 'stretch_orgs', text='Children Follow Tweaks', slider=True)
 
     @stage.generate_widgets
     def make_master_control_widget(self):
@@ -262,8 +260,8 @@ class BaseBendyRig(TweakChainRig):
         pbone.bbone_handle_type_end = 'TANGENT'
         pbone.bbone_custom_handle_start = self.get_bone(tweak)
         pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
-        pbone.bbone_easein = 0.0
-        pbone.bbone_easeout = 0.0
+        pbone.bbone_easein = 0.0 if i == 0 and not self.bbone_easein else 1.0
+        pbone.bbone_easeout = 0.0 if i == self.bbone_chain_length and not self.bbone_easeout else 1.0
 
     @stage.rig_bones
     def rig_deform_chain(self):
@@ -296,7 +294,7 @@ class BaseBendyRig(TweakChainRig):
         self.make_driver(
             pbone,
             'bbone_easein',
-            expression='scale_y - 1' if i == 0 and not self.bbone_easein else None,
+            expression='scale_y - 1',
             variables={
                 'scale_y': {
                     'type': v_type,
@@ -316,7 +314,7 @@ class BaseBendyRig(TweakChainRig):
         self.make_driver(
             pbone,
             'bbone_easeout',
-            expression='scale_y - 1' if i == self.bbone_chain_length and not self.bbone_easeout else None,
+            expression='scale_y - 1',
             variables={
                 'scale_y': {
                     'type': v_type,
