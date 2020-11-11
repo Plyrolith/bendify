@@ -313,7 +313,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
                 }
             )
         
-        if i < length:
+        if i < length - 1:
             self.make_driver(
                 pbone,
                 'bbone_rollout',
