@@ -230,7 +230,7 @@ class BaseLimbBendyRig(BaseLimbRig):
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         # Added copy scale constraint and bendy driver creation, excluded last deform segment
         if tweak and not i == len(self.bones.deform) - 1:
-            self.make_constraint(deform, 'COPY_LOCATION', tweak)
+            self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
             self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)

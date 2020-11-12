@@ -468,6 +468,7 @@ class ConnectingBendyRig(BaseBendyRig):
 
         self.use_incoming_tweak = self.params.incoming_tweak
         self.incoming_align = self.params.incoming_align
+        self.incoming_parent = None
         self.incoming_tweak = None
         self.incoming_tweak_mch = None
 
@@ -475,6 +476,7 @@ class ConnectingBendyRig(BaseBendyRig):
         # Exactly match bone position to parent
         first_bone = self.get_bone(self.bones.org[0])
         if self.use_incoming_tweak and first_bone.parent:
+            self.incoming_parent = first_bone.parent.name
             d_head = (first_bone.head - first_bone.parent.head).length
             d_tail = (first_bone.head - first_bone.parent.tail).length
             if d_head < d_tail:
@@ -501,29 +503,30 @@ class ConnectingBendyRig(BaseBendyRig):
         first_bone = self.bones.org[0]
         if self.use_incoming_tweak and self.get_bone_parent(first_bone):
             parent = self.rigify_parent
-            parent_tweaks = parent.bones.ctrl.tweak
-            delta = distance(self.obj, first_bone, parent_tweaks[0])
-            self.incoming_tweak = parent_tweaks[0]
-            for tweak in parent_tweaks:
-                dist = distance(self.obj, first_bone, tweak)
-                if dist < delta:
-                    delta = dist
-                    self.incoming_tweak = tweak
+            if hasattr(parent.bones, 'ctrl') and hasattr(parent.bones.ctrl, 'tweak'):
+                parent_tweaks = parent.bones.ctrl.tweak
+                delta = distance(self.obj, first_bone, parent_tweaks[0])
+                self.incoming_tweak = parent_tweaks[0]
+                for tweak in parent_tweaks:
+                    dist = distance(self.obj, first_bone, tweak)
+                    if dist < delta:
+                        delta = dist
+                        self.incoming_tweak = tweak
             
-            # Get incoming tweak mch, if existing
-            if hasattr(parent.bones, 'mch') and hasattr(parent.bones.mch, 'tweak'):
-                if self.get_bone_parent(self.incoming_tweak) in parent.bones.mch.tweak:
-                    self.incoming_tweak_mch = self.get_bone_parent(self.incoming_tweak)
-            
-            # Align
-            if self.incoming_tweak and self.incoming_tweak_mch and self.incoming_align and len(parent_tweaks) > 1:
-                tweak = self.bones.ctrl.tweak
-                if self.incoming_tweak == parent_tweaks[0]:
-                    self.align_bone(0, self.incoming_tweak, tweak[1], None, parent_tweaks[1])
-                    self.align_bone(0, tweak[0], parent_tweaks[1], None, tweak[1])
-                elif self.incoming_tweak == parent_tweaks[-1]:
-                    self.align_bone(0, self.incoming_tweak, parent_tweaks[-2], None, tweak[1])
-                    self.align_bone(0, tweak[0], parent_tweaks[-2], None, tweak[1])
+                # Get incoming tweak mch, if existing
+                if hasattr(parent.bones, 'mch') and hasattr(parent.bones.mch, 'tweak'):
+                    if self.get_bone_parent(self.incoming_tweak) in parent.bones.mch.tweak:
+                        self.incoming_tweak_mch = self.get_bone_parent(self.incoming_tweak)
+                
+                # Align
+                if self.incoming_tweak and self.incoming_tweak_mch and self.incoming_align and len(parent_tweaks) > 1:
+                    tweak = self.bones.ctrl.tweak
+                    if self.incoming_tweak == parent_tweaks[0]:
+                        self.align_bone(0, self.incoming_tweak, tweak[1], None, parent_tweaks[1])
+                        self.align_bone(0, tweak[0], parent_tweaks[1], None, tweak[1])
+                    elif self.incoming_tweak == parent_tweaks[-1]:
+                        self.align_bone(0, self.incoming_tweak, parent_tweaks[-2], None, tweak[1])
+                        self.align_bone(0, tweak[0], parent_tweaks[-2], None, tweak[1])
     
     @stage.generate_widgets
     def make_tweak_widgets(self):
@@ -544,11 +547,17 @@ class ConnectingBendyRig(BaseBendyRig):
     @stage.apply_bones
     def parent_tweak_mch_connected(self):
         # Re-parent first tweak mch to incoming tweak
+        mch = self.bones.mch.tweak[0]
         if self.incoming_tweak:
-            mch = self.bones.mch.tweak[0]
             self.set_bone_parent(mch, self.incoming_tweak)
             self.get_bone(mch).inherit_scale = 'NONE'
             self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
+        
+        # If not tweak, parent to actual parent
+        elif self.incoming_parent:
+            self.set_bone_parent(mch, self.incoming_parent)
+            self.get_bone(mch).inherit_scale = 'NONE'
+
 
     ####################################################
     # Deform bones
