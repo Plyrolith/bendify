@@ -76,6 +76,7 @@ class BaseLimbBendyRig(BaseLimbRig):
         # Bbone segments
         super().initialize()
         self.tweak_align_default = self.params.tweak_align_default
+        self.joints_ease = self.params.joints_ease
         self.keep_axis = 'SWING_Y'
 
     ##############################
@@ -224,13 +225,13 @@ class BaseLimbBendyRig(BaseLimbRig):
         pbone.bbone_handle_type_end = 'TANGENT'
         pbone.bbone_custom_handle_start = self.get_bone(tweak)
         pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
-        pbone.bbone_easein = 1.0 if entry.seg_idx and i > 0 else 0.0
-        pbone.bbone_easeout = 1.0 if next_entry and next_entry.seg_idx else 0.0
+        pbone.bbone_easein = 1.0 if entry.seg_idx and i > 0 else self.joints_ease
+        pbone.bbone_easeout = 1.0 if next_entry and next_entry.seg_idx else self.joints_ease
 
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         # Added copy scale constraint and bendy driver creation, excluded last deform segment
         if tweak and not i == len(self.bones.deform) - 1:
-            self.make_constraint(deform, 'COPY_LOCATION', tweak)
+            self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
             self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
@@ -509,14 +510,20 @@ class BaseLimbBendyRig(BaseLimbRig):
         super().add_parameters(params)
 
         params.tweak_align_default = bpy.props.BoolProperty(
-            name='Align Joint Tweaks by Default',
+            name='Align Joints',
             default=True,
             description='Align joint tweaks to interpolate between limb segments. This only affects the default, property can always be animated.'
+        )
+        params.joints_ease = bpy.props.BoolProperty(
+            name='Bendy Joints',
+            default=False,
+            description='Make joints bendy by default. Sets default ease for joint tweaks to 1.'
         )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        r = layout.row()
+        r = layout.row(align=True)
         r.prop(params, "tweak_align_default", toggle=True)
+        r.prop(params, "joints_ease", toggle=True)
 
         super().parameters_ui(layout, params)

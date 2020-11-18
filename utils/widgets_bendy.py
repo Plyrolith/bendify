@@ -21,17 +21,17 @@
 from rigify.utils.widgets import create_widget
 
 
-def create_sub_tweak_widget(rig, bone_name, bone_transform_name=None):
+def create_sub_tweak_widget(rig, bone_name, size=1.0, bone_transform_name=None):
     """ Creates a empty-shaped sub tweak widget.
     """
     obj = create_widget(rig, bone_name, bone_transform_name)
     if obj != None:
         verts = [
-            (0.0000, 0.0000, 0.2500),
-            (0.0000, 0.0000, -0.2500),
-            (0.0000, 0.2500, 0.0000),
-            (-0.2500, 0.0000, 0.0000),
-            (0.2500, 0.0000, 0.0000),
+            (0.0000, 0.0000, size),
+            (0.0000, 0.0000, -size),
+            (0.0000, size, 0.0000),
+            (-size, 0.0000, 0.0000),
+            (size, 0.0000, 0.0000),
             (0.0000, 0.0000, 0.0000)
         ]
         edges = [
@@ -44,4 +44,24 @@ def create_sub_tweak_widget(rig, bone_name, bone_transform_name=None):
         mesh = obj.data
         mesh.from_pydata(verts, edges, [])
         mesh.update()
+        mesh.update()
 
+def create_square_widget(rig, bone_name, size=1.0, bone_transform_name=None):
+    """ Creates a square widget, mostly used by facial rigs.
+    """
+    obj = create_widget(rig, bone_name, bone_transform_name)
+    if obj != None:
+        verts = [
+            (  0.5 * size, -2.9802322387695312e-08 * size,  0.5 * size ),
+            ( -0.5 * size, -2.9802322387695312e-08 * size,  0.5 * size ),
+            (  0.5 * size,  2.9802322387695312e-08 * size, -0.5 * size ),
+            ( -0.5 * size,  2.9802322387695312e-08 * size, -0.5 * size ),
+        ]
+
+        edges = [(0, 1), (2, 3), (0, 2), (3, 1) ]
+        faces = []
+
+        mesh = obj.data
+        mesh.from_pydata(verts, edges, faces)
+        mesh.update()
+        mesh.update()

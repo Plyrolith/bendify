@@ -313,26 +313,27 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
                 }
             )
         
-        self.make_driver(
-            pbone,
-            'bbone_rollout',
-            expression='swing_out * ' + str(i + 1) + ' / ' + str(length),
-            variables={
-                'swing_out': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': head,
-                            'transform_type': 'ROT_Y',
-                            'rotation_mode': 'SWING_TWIST_Y',
-                            'transform_space': space,
-                        }
-                    ]
+        if i < length - 1:
+            self.make_driver(
+                pbone,
+                'bbone_rollout',
+                expression='swing_out * ' + str(i + 1) + ' / ' + str(length),
+                variables={
+                    'swing_out': {
+                        'type': v_type,
+                        'targets':
+                        [
+                            {
+                                'id': self.obj,
+                                'bone_target': head,
+                                'transform_type': 'ROT_Y',
+                                'rotation_mode': 'SWING_TWIST_Y',
+                                'transform_space': space,
+                            }
+                        ]
+                    }
                 }
-            }
-        )
+            )
 
     @stage.configure_bones
     def configure_bbone_chain(self):
