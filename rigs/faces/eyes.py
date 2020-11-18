@@ -830,7 +830,7 @@ def create_sample(obj):
 
     bpy.ops.object.mode_set(mode='OBJECT')
     pbone = obj.pose.bones[bones['optic']]
-    pbone.rigify_type = 'bendy_faces.eyes'
+    pbone.rigify_type = 'faces.eyes'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
