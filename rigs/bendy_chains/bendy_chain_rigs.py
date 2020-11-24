@@ -46,6 +46,7 @@ class BaseBendyRig(TweakChainRig):
     def initialize(self):
         # Bbone segments
         super().initialize()
+        self.rotation_mode_tweak = self.params.rotation_mode_tweak
         self.bbone_segments = self.params.bbones_spine
         self.bbone_easein = self.params.bbones_easein
         self.bbone_easeout = self.params.bbones_easeout
@@ -213,7 +214,7 @@ class BaseBendyRig(TweakChainRig):
     def configure_tweak_bone(self, i, tweak):
         # Fully unlocked tweaks
         tweak_pb = self.get_bone(tweak)
-        tweak_pb.rotation_mode = 'ZXY'
+        tweak_pb.rotation_mode = self.rotation_mode_tweak
 
     ##############################
     # ORG chain
@@ -423,13 +424,33 @@ class BaseBendyRig(TweakChainRig):
     
     @classmethod
     def add_parameters(self, params):
-        # Added bbone segments
+        # Added rotation mode and bbone segments
+
         super().add_parameters(params)
+
+        rotation_modes = (
+            ('QUATERNION', 'Quaternion (WXYZ)', 'Quaternion (WXYZ)'),
+            ('XYZ', 'XYZ', 'XYZ'),
+            ('XZY', 'XZY', 'XZY'), 
+            ('YXZ', 'YXZ', 'YXZ'),
+            ('YZX', 'YZX', 'YZX'),
+            ('ZXY', 'ZXY', 'ZXY'),
+            ('ZYX', 'ZYX', 'ZYX'),
+            ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
+        )
+
+        params.rotation_mode_tweak = bpy.props.EnumProperty(
+            name        = 'Default Tweak Controller Rotation Mode',
+            items       = rotation_modes,
+            default     = 'ZXY',
+            description = 'Default rotation mode for tweak control bones'
+        )
 
         params.bbones_spine = bpy.props.IntProperty(
             name        = 'B-Bone Segments',
             default     = 8,
             min         = 1,
+            max         = 32,
             description = 'Number of B-Bone segments'
         )
 
@@ -447,7 +468,9 @@ class BaseBendyRig(TweakChainRig):
 
     @classmethod
     def parameters_ui(self, layout, params):
-        # Added bbone segments
+        # Added rotation modes and bbone segments
+        layout.row().prop(params, "rotation_mode_tweak", text="Tweaks")
+
         r = layout.row()
         r.prop(params, "bbones_spine")
 

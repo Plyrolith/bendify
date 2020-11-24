@@ -75,6 +75,8 @@ class BaseLimbBendyRig(BaseLimbRig):
     def initialize(self):
         # Bbone segments
         super().initialize()
+        self.rotation_mode_ik = self.params.rotation_mode_ik
+        self.rotation_mode_tweak = self.params.rotation_mode_tweak
         self.tweak_align_default = self.params.tweak_align_default
         self.joints_ease = self.params.joints_ease
         self.keep_axis = 'SWING_Y'
@@ -125,6 +127,15 @@ class BaseLimbBendyRig(BaseLimbRig):
         set_bone_widget_transform(self.obj, self.bones.ctrl.master, self.bones.org.main[0])
 
     ####################################################
+    # IK controls
+
+    @stage.configure_bones
+    def configure_ik_controls(self):
+        super().configure_ik_controls()
+        ik = self.get_bone(self.bones.ctrl.ik)
+        ik.rotation_mode = self.rotation_mode_ik
+
+    ####################################################
     # FK control chain
 
     def parent_fk_control_bone(self, i, ctrl, prev, org, parent_mch):
@@ -173,7 +184,7 @@ class BaseLimbBendyRig(BaseLimbRig):
     def configure_tweak_bone(self, i, tweak, entry):
         # Completely unlocked tweak
         tweak_pb = self.get_bone(tweak)
-        tweak_pb.rotation_mode = 'ZXY'
+        tweak_pb.rotation_mode = self.rotation_mode_tweak
 
     ####################################################
     # Tweak MCH chain
@@ -509,6 +520,31 @@ class BaseLimbBendyRig(BaseLimbRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
+        rotation_modes = (
+            ('QUATERNION', 'Quaternion (WXYZ)', 'Quaternion (WXYZ)'),
+            ('XYZ', 'XYZ', 'XYZ'),
+            ('XZY', 'XZY', 'XZY'), 
+            ('YXZ', 'YXZ', 'YXZ'),
+            ('YZX', 'YZX', 'YZX'),
+            ('ZXY', 'ZXY', 'ZXY'),
+            ('ZYX', 'ZYX', 'ZYX'),
+            ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
+        )
+
+        params.rotation_mode_ik = bpy.props.EnumProperty(
+            name        = 'Default IK Controller Rotation Mode',
+            items       = rotation_modes,
+            default     = 'QUATERNION',
+            description = 'Default rotation mode for IK control bones'
+        )
+
+        params.rotation_mode_tweak = bpy.props.EnumProperty(
+            name        = 'Default Tweak Controller Rotation Mode',
+            items       = rotation_modes,
+            default     = 'ZXY',
+            description = 'Default rotation mode for tweak control bones'
+        )
+
         params.tweak_align_default = bpy.props.BoolProperty(
             name='Align Joints',
             default=True,
@@ -525,5 +561,7 @@ class BaseLimbBendyRig(BaseLimbRig):
         r = layout.row(align=True)
         r.prop(params, "tweak_align_default", toggle=True)
         r.prop(params, "joints_ease", toggle=True)
+        layout.row().prop(params, "rotation_mode_ik", text="IK")
+        layout.row().prop(params, "rotation_mode_tweak", text="Tweaks")
 
         super().parameters_ui(layout, params)
