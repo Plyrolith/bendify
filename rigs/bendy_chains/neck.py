@@ -236,7 +236,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     
     def rig_org_head_bone(self, org, tweak, next_tweak):
         self.make_constraint(org, 'COPY_LOCATION', tweak)
-        self.make_constraint(org, 'COPY_SCALE', self.bones.mch.rot_neck)
+        self.make_constraint(org, 'COPY_SCALE', self.bones.ctrl.head)
         self.make_constraint(org, 'DAMPED_TRACK', tweak)
         stretch = self.make_constraint(org, 'STRETCH_TO', next_tweak)
         self.make_driver(stretch, 'bulge', variables=[(self.bones.ctrl.master, 'volume_variation')])
