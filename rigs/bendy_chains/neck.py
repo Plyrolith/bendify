@@ -89,8 +89,10 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         ctrl = self.bones.ctrl
         if self.long_neck:
             parents = [mch.tweak[0], *mch.chain, ctrl.head]
-        elif self.has_neck:
+        elif self.has_neck and len(mch) == 2:
             parents = [ctrl.neck, mch.stretch, ctrl.head]
+        elif self.has_neck:
+            parents = [ctrl.neck, ctrl.head]
         else:
             parents = ctrl.head
         return parents
@@ -314,7 +316,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
                 }
             )
         
-        if i < length - 1:
+        if i == 0 or i < length - 1:
             self.make_driver(
                 pbone,
                 'bbone_rollout',
