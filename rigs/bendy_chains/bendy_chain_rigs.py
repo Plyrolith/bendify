@@ -526,7 +526,7 @@ class ConnectingBendyRig(BaseBendyRig):
         first_bone = self.bones.org[0]
         if self.use_incoming_tweak and self.get_bone_parent(first_bone):
             parent = self.rigify_parent
-            if hasattr(parent.bones, 'ctrl') and hasattr(parent.bones.ctrl, 'tweak'):
+            if parent and hasattr(parent.bones, 'ctrl') and hasattr(parent.bones.ctrl, 'tweak'):
                 parent_tweaks = parent.bones.ctrl.tweak
                 delta = distance(self.obj, first_bone, parent_tweaks[0])
                 self.incoming_tweak = parent_tweaks[0]
