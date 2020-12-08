@@ -42,6 +42,7 @@ class Rig(SpineRig, BaseBendyRig):
     """
 
     def initialize(self):
+        self.rotation_mode_end = self.params.rotation_mode_end
         super().initialize()
         
         #self.stretch_orgs_default = 0.0
@@ -71,6 +72,16 @@ class Rig(SpineRig, BaseBendyRig):
     def make_volume_control_widget(self):
         bone = self.bones.ctrl.volume
         create_gear_widget(self.obj, bone, size=4)
+
+    ####################################################
+    # Main control bones
+
+    @stage.configure_bones
+    def configure_end_control_bones(self):
+        hips_pb = self.get_bone(self.bones.ctrl.hips)
+        chest_pb = self.get_bone(self.bones.ctrl.chest)
+        hips_pb.rotation_mode = self.rotation_mode_end
+        chest_pb.rotation_mode = self.rotation_mode_end
 
     ####################################################
     # MCH bones associated with main controls
@@ -144,16 +155,37 @@ class Rig(SpineRig, BaseBendyRig):
     # SETTINGS
 
     @classmethod
+    def add_parameters(self, params):
+        # Added rotation mode
+
+        super().add_parameters(params)
+
+        rotation_modes = (
+            ('QUATERNION', 'Quaternion (WXYZ)', 'Quaternion (WXYZ)'),
+            ('XYZ', 'XYZ', 'XYZ'),
+            ('XZY', 'XZY', 'XZY'), 
+            ('YXZ', 'YXZ', 'YXZ'),
+            ('YZX', 'YZX', 'YZX'),
+            ('ZXY', 'ZXY', 'ZXY'),
+            ('ZYX', 'ZYX', 'ZYX'),
+            ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
+        )
+
+        params.rotation_mode_end = bpy.props.EnumProperty(
+            name        = 'Default Chest & Hip Rotation Mode',
+            items       = rotation_modes,
+            default     = 'QUATERNION',
+            description = 'Default rotation mode for chest and hip control bones'
+        )
+    
+    @classmethod
     def parameters_ui(self, layout, params):
-        # Added bbone segments
-        r = layout.row()
-        r.prop(params, "bbones_spine")
+        layout.row().prop(params, 'make_custom_pivot')
+        layout.row().prop(params, 'pivot_pos')
+        layout.row().prop(params, 'rotation_mode_end', text="Chest & Hips")
 
-        r = layout.row(align=True)
-        r.prop(params, "bbones_easein", text="Ease In", toggle=True)
-        r.prop(params, "bbones_easeout", text="Ease Out", toggle=True)
-
-        super().parameters_ui(layout, params)
+        BaseBendyRig.parameters_ui(layout, params)
+        ControlLayersOption.FK.parameters_ui(layout, params)
 
 
 import bpy

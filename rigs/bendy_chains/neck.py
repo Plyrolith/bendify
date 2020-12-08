@@ -89,8 +89,10 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         ctrl = self.bones.ctrl
         if self.long_neck:
             parents = [mch.tweak[0], *mch.chain, ctrl.head]
-        elif self.has_neck:
+        elif self.has_neck and len(mch) == 2:
             parents = [ctrl.neck, mch.stretch, ctrl.head]
+        elif self.has_neck:
+            parents = [ctrl.neck, ctrl.head]
         else:
             parents = ctrl.head
         return parents
@@ -236,7 +238,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     
     def rig_org_head_bone(self, org, tweak, next_tweak):
         self.make_constraint(org, 'COPY_LOCATION', tweak)
-        self.make_constraint(org, 'COPY_SCALE', self.bones.mch.rot_neck)
+        self.make_constraint(org, 'COPY_SCALE', self.bones.ctrl.head)
         self.make_constraint(org, 'DAMPED_TRACK', tweak)
         stretch = self.make_constraint(org, 'STRETCH_TO', next_tweak)
         self.make_driver(stretch, 'bulge', variables=[(self.bones.ctrl.master, 'volume_variation')])
@@ -314,7 +316,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
                 }
             )
         
-        if i < length - 1:
+        if i == 0 or i < length - 1:
             self.make_driver(
                 pbone,
                 'bbone_rollout',
