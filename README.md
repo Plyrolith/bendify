@@ -1,4 +1,4 @@
-# rigify_bendy (Rigify Extension)
+# Bendify (Rigify Extension)
 
 Rigify extension with REAL bendy bone controls and improved metarigs
 
