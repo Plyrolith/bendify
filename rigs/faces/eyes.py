@@ -38,15 +38,15 @@ class Rig:
         self.face_length = obj.data.bones[ self.org_bones[0] ].parent.length if obj.data.bones[ self.org_bones[0] ].parent else obj.data.bones[ self.org_bones[0] ].length * 4
         self.params      = params
 
-        if params.primary_layers_extra:
-            self.primary_layers = list(params.primary_layers)
+        if params.eyes_primary_layers_extra:
+            self.eyes_primary_layers = list(params.eyes_primary_layers)
         else:
-            self.primary_layers = None
+            self.eyes_primary_layers = None
 
-        if params.secondary_layers_extra:
-            self.secondary_layers = list(params.secondary_layers)
+        if params.eyes_secondary_layers_extra:
+            self.eyes_secondary_layers = list(params.eyes_secondary_layers)
         else:
-            self.secondary_layers = None
+            self.eyes_secondary_layers = None
 
     def orient_org_bones(self):
 
@@ -188,12 +188,12 @@ class Rig:
 
         for bone in tweaks:
             if bone in primary_tweaks:
-                if self.primary_layers:
-                    pb[bone].bone.layers = self.primary_layers
+                if self.eyes_primary_layers:
+                    pb[bone].bone.layers = self.eyes_primary_layers
                 create_face_widget( self.obj, bone, size = 1.5 )
             else:
-                if self.secondary_layers:
-                    pb[bone].bone.layers = self.secondary_layers
+                if self.eyes_secondary_layers:
+                    pb[bone].bone.layers = self.eyes_secondary_layers
                 create_face_widget( self.obj, bone )
 
         return { 'all' : tweaks }
@@ -623,22 +623,22 @@ def add_parameters(params):
     """
 
     # Setting up extra layers for the tweak bones
-    params.primary_layers_extra = bpy.props.BoolProperty(
-        name="primary_layers_extra",
+    params.eyes_primary_layers_extra = bpy.props.BoolProperty(
+        name="eyes_primary_layers_extra",
         default=True,
         description=""
         )
-    params.primary_layers = bpy.props.BoolVectorProperty(
+    params.eyes_primary_layers = bpy.props.BoolVectorProperty(
         size=32,
         description="Layers for the primary controls to be on",
         default=tuple([i == 1 for i in range(0, 32)])
         )
-    params.secondary_layers_extra = bpy.props.BoolProperty(
-        name="secondary_layers_extra",
+    params.eyes_secondary_layers_extra = bpy.props.BoolProperty(
+        name="eyes_secondary_layers_extra",
         default=True,
         description=""
         )
-    params.secondary_layers = bpy.props.BoolVectorProperty(
+    params.eyes_secondary_layers = bpy.props.BoolVectorProperty(
         size=32,
         description="Layers for the secondary controls to be on",
         default=tuple([i == 1 for i in range(0, 32)])
@@ -647,7 +647,7 @@ def add_parameters(params):
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters."""
-    layers = ["primary_layers", "secondary_layers"]
+    layers = ["eyes_primary_layers", "eyes_secondary_layers"]
 
     bone_layers = bpy.context.active_pose_bone.bone.layers[:]
 
@@ -837,11 +837,11 @@ def create_sample(obj):
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
     try:
-        pbone.rigify_parameters.primary_layers = [False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.eyes_primary_layers = [False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.secondary_layers = [False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.eyes_secondary_layers = [False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['lid.T.L']]
