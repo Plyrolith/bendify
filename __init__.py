@@ -7,18 +7,32 @@ from bpy.utils import register_class, unregister_class
 from bpy.types import Scene
 from bpy.props import PointerProperty
 
-from . import alm_ops
-from . import alm_ui
-from .properties import BendifySceneSettings
+from .alm_ops import *
+from .alm_ui import *
+from .tools_ops import *
+from .tools_ui import *
+from .rigify_ui import *
+from .props import BendifySceneSettings
 
 classes = (
+    BENDIFY_OT_AlmToggle,
+    BENDIFY_OT_AlmSelect,
+    BENDIFY_OT_AlmLock,
+    BENDIFY_OT_AlmAdd,
+    BENDIFY_OT_AlmSolo,
+    BENDIFY_OT_DrawBlendSwitch,
+    BENDIFY_OT_StretchToReset,
+    BENDIFY_OT_ConstraintsMirror,
+    BENDIFY_OT_ConstraintAddArmature,
+    BENDIFY_OT_ObjectNamesNormalize,
+    BENDIFY_OT_AddBoneGroups,
+    BENDIFY_PT_ArmatureLayerManagerViewport,
+    BENDIFY_PT_BoneGroups,
+    BENDIFY_PT_BoneType,
+    BENDIFY_PT_RigifyButtons,
+    BENDIFY_PT_BendifyToolsPose,
+    BENDIFY_PT_BendifyToolsObject,
     BendifySceneSettings,
-    alm_ops.BENDIFY_OT_AlmToggle,
-    alm_ops.BENDIFY_OT_AlmSelect,
-    alm_ops.BENDIFY_OT_AlmLock,
-    alm_ops.BENDIFY_OT_AlmAdd,
-    alm_ops.BENDIFY_OT_AlmSolo,
-    alm_ui.BENDIFY_PT_ArmatureLayerManagerViewport,
 )
 
 def register():

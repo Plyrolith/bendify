@@ -2,14 +2,9 @@ import bpy
 
 class AlmMixIn():
     """Mix-in class for armature layer manager objects, providing poll and armature identification"""
-
-    @classmethod
-    def poll(self, context):
-        #return self.arma(context)
-        return False
     
     def arma_single(self, context):
-        '''Check if there is only one armature in the scene and return if so'''
+        '''Check if there is only one armature in the scene and return object if so'''
         arma_objs = [obj for obj in context.scene.objects if obj.type == 'ARMATURE']
         if len(arma_objs) == 1:
             return arma_objs[0]
@@ -18,37 +13,52 @@ class AlmMixIn():
         '''Return the most definitive armature object candidate'''
         pin = context.scene.bendify.alm_pin
         act = context.active_object
-        arma_single = self.arma_single(context)
         if pin:
             return pin
-        elif arma_single:
-            return arma_single
+        elif self.arma_single(context):
+            return self.arma_single(context)
         elif act and act.type == 'ARMATURE':
             return act
     
+    def meta_check(self, obj):
+        '''Check if obj is metarig'''
+        return hasattr(obj.data, 'rigify_layers') and len(obj.data.rigify_layers) >= 29
+
+    def meta_any(self, context):
+        '''Return all metarigs (data) in the scene'''
+        return [obj for obj in context.scene.objects if obj.type == 'ARMATURE' and self.meta_check(obj)]
+
     def meta_single(self, context):
-        '''Check if there is only one metarig in the scene and return if so'''
-        meta_objs = [obj for obj in context.scene.objects if obj.type == 'ARMATURE' and not hasattr(obj.data, '["rig_id"]')]
+        '''Check if there is only one metarig in the scene and return object if so'''
+        meta_objs = self.meta_any(context)
         if len(meta_objs) == 1:
-            return meta_objs[0].data
+            return meta_objs[0]
 
     def meta(self, context):
-        '''Return the most definitive metarig data candidate'''
+        '''Return the most definitive metarig candidate'''
         meta = context.scene.bendify.alm_meta
         act = context.active_object
         arma = self.arma(context)
-        meta_single = self.meta_single(context)
         if meta:
             return meta
-        elif meta_single:
-            return meta_single
-        elif arma and getattr(arma.data, 'rigify_layers'):
-            return arma.data
-        elif act and act.type == 'ARMATURE' and not hasattr(act, '["rig_id"]'):
-            return act.data
+        elif self.meta_single(context):
+            return self.meta_single(context)
+        elif arma and self.meta_check(arma):
+            return arma
+        elif act and act.type == 'ARMATURE' and self.meta_check(act):
+            return act
     
     def bendify(self, context):
         return context.scene.bendify
+    
+    @classmethod
+    def poll(self, context):
+        pin = context.scene.bendify.alm_pin
+        act = context.active_object
+        if pin:
+            return pin
+        elif act and act.type == 'ARMATURE':
+            return act
 
 class BENDIFY_OT_AlmToggle(bpy.types.Operator, AlmMixIn):
     """Toggle armature layer visibility for all layers"""
@@ -133,7 +143,7 @@ class BENDIFY_OT_AlmAdd(bpy.types.Operator, AlmMixIn):
     bl_options = {'REGISTER', 'UNDO'}
     
     layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
-    move: bpy.props.IntProperty(name="Move to Layer", default=False)
+    move: bpy.props.BoolProperty(name="Move", default=False)
     
     @classmethod
     def poll(self, context):
@@ -148,8 +158,8 @@ class BENDIFY_OT_AlmAdd(bpy.types.Operator, AlmMixIn):
         for bone in bones:
             bone.layers[self.layer] = True
             if self.move:
-                for i, b_layer in enumerate(bone.layers):
-                    if not i == layer:
+                for i in range(31):
+                    if not i == self.layer:
                         bone.layers[i] = False
         return {"FINISHED"}
 
@@ -157,14 +167,14 @@ class BENDIFY_OT_AlmSolo(bpy.types.Operator, AlmMixIn):
     """Set armature layer to solo"""
     bl_idname = 'view3d.armature_layer_manager_solo'
     bl_label = "Solo Layer"
-    bl_options = {'INTERNAL', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
 
     def execute(self, context):
         obj = self.arma(context)
         obj.data.layers[self.layer] = True
-        for i, a_layer, in enumerate(obj.data.layers):
+        for i in range(31):
             if not i == self.layer:
                 obj.data.layers[i] = False
         return {"FINISHED"}

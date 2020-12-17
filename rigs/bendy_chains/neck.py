@@ -89,7 +89,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         ctrl = self.bones.ctrl
         if self.long_neck:
             parents = [mch.tweak[0], *mch.chain, ctrl.head]
-        elif self.has_neck and len(mch) == 2:
+        elif self.has_neck and len(mch) > 1:
             parents = [ctrl.neck, mch.stretch, ctrl.head]
         elif self.has_neck:
             parents = [ctrl.neck, ctrl.head]
