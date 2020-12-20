@@ -2,8 +2,6 @@ import bpy
 import re
 import unicodedata
 
-from mathutils import Color
-
 class BENDIFY_OT_StretchToReset(bpy.types.Operator):
     """Reset Stretch To constraint length for selected bones"""
     bl_idname = 'pose.stretchto_reset'
@@ -48,7 +46,9 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
                 return name.replace(pair[0], pair[1])
         
         def mirror_bone(obj, bone):
-            return obj.pose.bones[mirror_name(bone.name)]
+            mn = mirror_name(bone.name)
+            if mn and mn in obj.pose.bones:
+                return obj.pose.bones[mn]
 
         obj = context.active_object
         pbones = context.selected_pose_bones
@@ -83,9 +83,9 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
         obj.data.bones.active = obj.data.bones[pb_active.name]
         return {"FINISHED"}
 
-class BENDIFY_OT_ConstraintAddArmature(bpy.types.Operator):
+class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
     """Add armature constraints with targets"""
-    bl_idname = 'pose.constraint_add_armature'
+    bl_idname = 'pose.constraints_add_armature'
     bl_label = "Add Targeted Armature Constraints"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -127,7 +127,7 @@ class BENDIFY_OT_ConstraintAddArmature(bpy.types.Operator):
                 context_c["constraint"] = constraint
                 data.bones.active = data.bones[pbone.name]
                 for i in range(i):
-                    bpy.ops.constraint.move_up(context_c, constraint=c.name, owner='BONE')
+                    bpy.ops.constraint.move_up(context_c, constraint.name, 'BONE')
                 data.bones.active = pb_act
             return i
 
@@ -233,8 +233,7 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
             for k, v in name_dict.items():
                 row = box.row(align=True)
                 row.label(text=k.name, icon=icon)
-                row.label(text="", icon='DISCLOSURE_TRI_RIGHT')
-                row.label(text=v)
+                row.label(text=v, icon='DISCLOSURE_TRI_RIGHT')
                 #row.label(text=k.name + " > " + v, icon=icon)
 
     def object_names_normalize(self, context):
@@ -346,16 +345,16 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
                     obj_names[obj] = obj_name_new
 
                 # Data renaming
-                if self.data and hasattr(obj.data, 'users'):
+                if self.data and obj.data not in blocklist_data and hasattr(obj.data, 'users'):
                     data_name_new = obj_name_new
 
                     # Multi user data
-                    if obj.data.users > 1 and obj.data not in blocklist_data and self.multi:
+                    if obj.data.users > 1:
                         # Check if last segment is numeric
-                        dot_segs = obj_name_new.split(".")
+                        dot_segs = obj_name_new.split(".") if self.multi else obj.data.name.split(".")
                         data_name_new = rename(
                             prefix,
-                            dot_segs[:-1] if dot_segs[-1].isnumeric() else obj_name_new,
+                            ".".join(dot_segs[:-1]) if dot_segs[-1].isnumeric() else ".".join(dot_segs),
                             self.lower,
                             self.widgets
                         )
@@ -366,74 +365,58 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
         
         return (obj_names, data_names)
 
-class BENDIFY_OT_AddBoneGroups(bpy.types.Operator):
-    bl_idname = "armature.bendify_add_bone_groups"
-    bl_label = "Add Bendify Bone Groups"
+class BENDIFY_OT_MaterialSlotsSwitch(bpy.types.Operator):
+    """Convert material slots links for selected objects"""
+    bl_idname = 'view3d.material_slots_switch'
+    bl_label = "Switch Material Slot Links"
     bl_options = {'REGISTER', 'UNDO'}
+
+    mode: bpy.props.EnumProperty(
+            items=[
+                ('OBJECT', "Object", "Object", 'OBJECT_DATA', 0),
+                ('DATA', "Data", "Data", 'MESH_DATA', 1)
+            ],
+            name="Link Mode",
+            default='OBJECT'
+        )
+    selected: bpy.props.BoolProperty(name="Selected Only", default=True)
+    unlink: bpy.props.BoolProperty(name="Unlink Material from Other Slot", default=False)
 
     @classmethod
     def poll(cls, context):
-        return context.object and context.object.type == 'ARMATURE'
-
+        return bpy.data.objects
+    
     def execute(self, context):
-        obj = context.object
-        arma = obj.data
-        if not hasattr(arma, 'rigify_colors'):
-            return {'FINISHED'}
-
-        groups = {
-            'Root': [
-                Color((1.0, 1.0, 1.0)),
-                Color((1.0, 0.5, 0.0)),
-                Color((1.0, 0.75, 0.5))
-            ],
-            'Left': [
-                Color((1.0, 1.0, 1.0)),
-                Color((1.0, 0.1, 0.1)),
-                Color((1.0, 0.5, 0.5))
-            ],
-            'Center': [
-                Color((1.0, 1.0, 1.0)),
-                Color((0.0, 1.0, 1.0)),
-                Color((0.5, 1.0, 1.0))
-            ],
-            'Right': [
-                Color((1.0, 1.0, 1.0)),
-                Color((0.0, 0.15, 1.0)),
-                Color((0.5, 0.5, 1.0))
-            ],
-            'Tweak': [
-                Color((1.0, 1.0, 1.0)),
-                Color((1.0, 1.0, 0.0)),
-                Color((1.0, 1.0, 0.5))
-            ],
-            'Details': [
-                Color((1.0, 1.0, 1.0)),
-                Color((0.0, 1.0, 0.0)),
-                Color((0.5, 1.0, 0.5))
-            ],
-            'Extra': [
-                Color((1.0, 1.0, 1.0)),
-                Color((1.0, 0.0, 1.0)),
-                Color((1.0, 0.5, 1.0))
-            ]
+        objects = context.selected_objects if self.selected else bpy.data.objects
+        opposite = {
+            'OBJECT': 'DATA',
+            'DATA': 'OBJECT'
         }
+        for obj in objects:
+            for slot in obj.material_slots:
+                if slot.link is not self.mode:
+                    if slot.material:
+                        mat = slot.material
+                        if self.unlink:
+                            slot.material = None
+                    else:
+                        mat = None
+                    slot.link = self.mode
+                    if mat:
+                        slot.material = mat
+                elif self.unlink:
+                    slot.link = opposite[self.mode]
+                    slot.material = None
+                    slot.link = self.mode
 
-        for g in groups:
-            if g in arma.rigify_colors.keys():
-                continue
+        return {"FINISHED"}
 
-            col = arma.rigify_colors.add()
-            col.name = g
-
-            col.active = groups[g][0]
-            col.normal = groups[g][1]
-            col.select = groups[g][2]
-            col.standard_colors_lock = True
-        
-        arma.rigify_colors_lock = False
-
-        return {'FINISHED'}
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+        col.row().prop(self, 'mode', expand=True)
+        col.row().prop(self, 'selected')
+        col.row().prop(self, 'unlink')
 
 class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
     """Switch brush blend method in drawing mode"""
