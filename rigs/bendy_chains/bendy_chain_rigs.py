@@ -595,14 +595,14 @@ class ConnectingBendyRig(BaseBendyRig):
         if not self.incoming == 'NONE' and hasattr(self, 'rigify_parent') and self.rigify_parent:
             self.incoming_parent = self.get_bone(self.bones.org[0]).parent.name
 
-            self.first_bone_matrix = first_bone.matrix
-            self.first_bone_length = first_bone.length
-            self.first_bone_x_axis = first_bone.x_axis
-            self.first_bone_y_axis = first_bone.y_axis
-
             # Match position of first bone head if desired
-            match = ['PARENT', 'TWEAK', 'MERGE']
+            match = ('PARENT', 'TWEAK', 'MERGE')
             if self.incoming in match:
+
+                self.first_bone_matrix = first_bone.matrix
+                self.first_bone_length = first_bone.length
+                self.first_bone_x_axis = first_bone.x_axis
+                self.first_bone_y_axis = first_bone.y_axis
 
                 x_axis = first_bone.x_axis
                 d_head = (first_bone.head - first_bone.parent.head).length
