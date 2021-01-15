@@ -26,7 +26,7 @@ from rigify.base_rig import stage
 from rigify.utils.naming import strip_org, make_derived_name
 from rigify.utils.misc import map_list
 from rigify.utils.layers import ControlLayersOption
-from rigify.utils.bones import align_bone_orientation, align_bone_roll, align_bone_y_axis, put_bone, set_bone_widget_transform
+from rigify.utils.bones import align_bone_orientation, align_bone_roll, align_bone_x_axis, align_bone_y_axis, put_bone, set_bone_widget_transform
 from rigify.utils.widgets_basic import create_circle_widget
 from rigify.rigs.widgets import create_ballsocket_widget, create_gear_widget
 
@@ -534,7 +534,9 @@ class SegmentedBendyRig(BaseBendyRig):
         ctrls = self.bones.ctrl
         for mch in self.bones.mch.fk:
             self.make_constraint(mch, 'COPY_SCALE', self.root_bone)
-            if self.master_control == 'ROTATION' and len(ctrls.fk) > 1:
+
+            # Add master control constraint if necessary
+            if hasattr(self, 'master_control') and self.master_control == 'ROTATION' and len(ctrls.fk) > 1:
                 self.make_constraint(mch, 'COPY_ROTATION', ctrls.master, space='LOCAL')
 
     ####################################################
@@ -563,6 +565,10 @@ class SegmentedBendyRig(BaseBendyRig):
 
         self.make_driver(counter_volume, 'power', expression='1 - var * 0.5', variables=[(self.default_prop_bone, 'volume_variation')])
 
+        # Add master control constraint if necessary
+        if hasattr(self, 'master_control') and not self.master_control == 'NONE':
+            self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master, use_y=False, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+
 
 class ConnectingBendyRig(BaseBendyRig):
     """
@@ -577,32 +583,43 @@ class ConnectingBendyRig(BaseBendyRig):
         self.tip_scale = self.params.tip_scale
         self.tip_scale_uniform = self.params.tip_scale_uniform
         self.incoming_tweak = None
+        self.incoming_parent = None
         self.first_bone_matrix = None
         self.first_bone_length = None
+        self.first_bone_x_axis = None
+        self.first_bone_y_axis = None
         
     def prepare_bones(self):
         '''Find connection parent'''
         first_bone = self.get_bone(self.bones.org[0])
         if not self.incoming == 'NONE' and hasattr(self, 'rigify_parent') and self.rigify_parent:
+            self.incoming_parent = self.get_bone(self.bones.org[0]).parent.name
+
             self.first_bone_matrix = first_bone.matrix
             self.first_bone_length = first_bone.length
+            self.first_bone_x_axis = first_bone.x_axis
+            self.first_bone_y_axis = first_bone.y_axis
 
             # Match position of first bone head if desired
             match = ['PARENT', 'TWEAK', 'MERGE']
             if self.incoming in match:
 
+                x_axis = first_bone.x_axis
                 d_head = (first_bone.head - first_bone.parent.head).length
                 d_tail = (first_bone.head - first_bone.parent.tail).length
                 if d_head < d_tail:
                     first_bone.head = first_bone.parent.head
                 else:
                     first_bone.head = first_bone.parent.tail
+                # Fix roll
+                align_bone_x_axis(self.obj, self.bones.org[0], x_axis)
 
     ####################################################
     # Control chain
 
     @stage.parent_bones
     def position_first_control(self):
+        '''Restore bone positions if first head was moved'''
         if self.first_bone_matrix and self.first_bone_length:
             if self.org_transform == 'FK':
                 first_org = self.get_bone(self.bones.org[0])
@@ -620,6 +637,12 @@ class ConnectingBendyRig(BaseBendyRig):
                 master = self.get_bone(self.bones.ctrl.master)
                 master.matrix = self.first_bone_matrix
                 master.length = self.first_bone_length
+            #Align tip with original position if chain has only one segment
+            if len(self.bones.org) == 1:
+                align_bone_y_axis(self.obj, self.bones.mch.tweak[-1], self.first_bone_y_axis)
+                align_bone_x_axis(self.obj, self.bones.mch.tweak[-1], self.first_bone_x_axis)
+                align_bone_y_axis(self.obj, self.bones.ctrl.tweak[-1], self.first_bone_y_axis)
+                align_bone_x_axis(self.obj, self.bones.ctrl.tweak[-1], self.first_bone_x_axis)
 
     ####################################################
     # Tweak chain
@@ -627,7 +650,7 @@ class ConnectingBendyRig(BaseBendyRig):
     @stage.parent_bones
     def check_incoming_tweak(self):
         '''Check for nearest Tweak of parent and move first org head there'''
-        move = ['TWEAK', 'MERGE']
+        move = ('TWEAK', 'MERGE')
         first_bone = self.bones.org[0]
         if self.incoming in move and hasattr(self, 'rigify_parent'):
             parent = self.rigify_parent
@@ -698,16 +721,17 @@ class ConnectingBendyRig(BaseBendyRig):
         mch = self.bones.mch.tweak[0]
 
         if self.incoming_tweak:
+            # Parent first tweak MCH to incoming tweak
             self.set_bone_parent(mch, self.incoming_tweak)
-            self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
+            #self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
         
-        elif not self.incoming == "NONE":
+        elif self.incoming_parent:
             # If not tweak, parent to actual parent
-            if hasattr(self, 'rigify_parent'):
-                self.set_bone_parent(mch, self.get_bone(self.bones.org[0]).parent.name)
+            self.set_bone_parent(mch, self.incoming_parent)
+        
+        elif not self.incoming == 'NONE':
             # Without parent use root
-            else:
-                self.set_bone_parent(mch, self.root_bone)
+            self.set_bone_parent(mch, self.root_bone)
         
         # Re-parent tip tweak mch
         if self.tip_parent_bone and self.tip_parent_bone in self.obj.data.edit_bones:
@@ -823,6 +847,24 @@ class MasterControlBendyRig(BaseBendyRig):
                 create_gear_widget(self.obj, bone, size=4)
                 transform = ctrls.fk[0]
             set_bone_widget_transform(self.obj, bone, transform)
+    
+    ####################################################
+    # Control chain
+
+    @stage.rig_bones
+    def rig_control_chain(self):
+        '''Add master control constraints if no MCH found'''
+        if not self.master_control == 'NONE' and not hasattr(self.bones.mch, 'fk'):
+            for ctrl in self.bones.ctrl.fk:
+                self.make_constraint(ctrl, 'COPY_ROTATION', self.bones.ctrl.master, mix_mode='BEFORE', target_space='LOCAL', owner_space='LOCAL')
+
+    ####################################################
+    # Deform chain
+
+    def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
+        super().rig_deform_bone(i, deform, tweak, next_tweak, fk)
+        if not self.master_control == 'NONE':
+            self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master, use_y=False, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
 
     ####################################################
     # SETTINGS
