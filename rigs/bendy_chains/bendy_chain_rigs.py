@@ -658,7 +658,6 @@ class ConnectingBendyRig(BaseBendyRig):
                     align_bone_roll(self.obj, first_tweak, self.incoming_tweak)
                     align_bone_roll(self.obj, first_tweak_mch, self.incoming_tweak)
 
-    
     @stage.rig_bones
     def rig_tweak_chain(self):
         '''Copy scale offset for connected tweak'''
@@ -697,19 +696,18 @@ class ConnectingBendyRig(BaseBendyRig):
     def parent_tweak_mch_apply(self):
         '''Re-parent first and tip tweak MCH'''
         mch = self.bones.mch.tweak[0]
-        parent = ['ATTACH', 'PARENT']
 
         if self.incoming_tweak:
             self.set_bone_parent(mch, self.incoming_tweak)
             self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
         
-        # If not tweak, parent to actual parent
-        elif self.incoming in parent and hasattr(self, 'rigify_parent'):
-            self.set_bone_parent(mch, self.get_bone(self.bones.org[0]).parent.name)
-        
-        # Without parent use root
-        else:
-            self.set_bone_parent(mch, self.root_bone)
+        elif not self.incoming == "NONE":
+            # If not tweak, parent to actual parent
+            if hasattr(self, 'rigify_parent'):
+                self.set_bone_parent(mch, self.get_bone(self.bones.org[0]).parent.name)
+            # Without parent use root
+            else:
+                self.set_bone_parent(mch, self.root_bone)
         
         # Re-parent tip tweak mch
         if self.tip_parent_bone and self.tip_parent_bone in self.obj.data.edit_bones:

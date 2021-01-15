@@ -46,9 +46,7 @@ def align_bone(obj, bone_name, prev_target, roll_target, next_target, reverse=Fa
     if prev_target and next_target:
         n = get_bone(obj, next_target)
         p = get_bone(obj, prev_target)
-        vec = n.head - p.head
-        if reverse:
-            vec *= 1
+        vec = p.head - n.head if reverse else n.head - p.head
         align_bone_y_axis(obj, bone_name, vec)
-    if roll_target:
-        align_bone_roll(obj, bone_name, roll_target)
+        if roll_target:
+            align_bone_roll(obj, bone_name, roll_target)
