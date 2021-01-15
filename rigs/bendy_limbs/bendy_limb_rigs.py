@@ -27,6 +27,8 @@ from rigify.utils.naming import make_derived_name
 from rigify.base_rig import stage
 from rigify.rigs.limbs.limb_rigs import BaseLimbRig
 
+from ...utils.bones import align_bone
+
 from itertools import count
 
 
@@ -84,13 +86,12 @@ class BaseLimbBendyRig(BaseLimbRig):
     ##############################
     # Utilities
 
-    def align_bone(self, i, bone, prev_target, curr_target, next_target):
-        # Realign bone between to targets
-        if prev_target and next_target:
-            b = self.get_bone(bone)
-            length = b.length
-            b.tail = b.head + self.get_bone(next_target).head - self.get_bone(prev_target).head
-            b.length = length
+    def check_entry_targets(self, entry):
+        '''Return ORG triple (previous, current & next) based on entry '''
+        p = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
+        c = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx][0].org)
+        n = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
+        return p, c, n
 
     ####################################################
     # Master control
@@ -116,13 +117,14 @@ class BaseLimbBendyRig(BaseLimbRig):
 
     @stage.configure_bones
     def configure_master_control(self):
-        # Unlocked master control scale
+        '''Unlocked master control scale'''
         super().configure_master_control()
         bone = self.get_bone(self.bones.ctrl.master)
         bone.lock_scale = (False, False, False)
     
     @stage.generate_widgets
     def make_master_control_widget(self):
+        '''Set widget transform to first ORG'''
         super().make_master_control_widget()
         set_bone_widget_transform(self.obj, self.bones.ctrl.master, self.bones.org.main[0])
 
@@ -139,7 +141,7 @@ class BaseLimbBendyRig(BaseLimbRig):
     # FK control chain
 
     def parent_fk_control_bone(self, i, ctrl, prev, org, parent_mch):
-        # Disconnected FK control bones
+        '''Disconnected FK control bones'''
         if parent_mch:
             self.set_bone_parent(ctrl, parent_mch)
         else:
@@ -154,7 +156,7 @@ class BaseLimbBendyRig(BaseLimbRig):
 
     @stage.parent_bones
     def parent_org_chain(self):
-        # Disconnect ALL org bones
+        '''Disconnect ALL org bones'''
         orgs = self.bones.org.main
         for org in orgs:
             self.get_bone(org).use_connect = False
@@ -170,19 +172,17 @@ class BaseLimbBendyRig(BaseLimbRig):
     def parent_tweak_bone(self, i, tweak, mch, entry):
         self.set_bone_parent(tweak, mch)
         if not i == 0 and entry.seg_idx == 0:
-            prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
-            next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
-            self.align_bone(0, tweak, prev_org, None, next_org)
+            p, c, n = self.check_entry_targets(entry)
+            align_bone(self.obj, tweak, p, c, n)
 
     def rig_tweak_bone(self, i, tweak, entry):
         super().rig_tweak_mch_bone(i, tweak, entry)
         if not i == 0 and entry.seg_idx == 0:
-            prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
-            next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
-            self.align_bone(0, tweak, prev_org, None, next_org)
+            p, c, n = self.check_entry_targets(entry)
+            align_bone(self.obj, tweak, p, c, n)
 
     def configure_tweak_bone(self, i, tweak, entry):
-        # Completely unlocked tweak
+        '''Completely unlocked tweak'''
         tweak_pb = self.get_bone(tweak)
         tweak_pb.rotation_mode = self.rotation_mode_tweak
 
@@ -192,9 +192,8 @@ class BaseLimbBendyRig(BaseLimbRig):
     def parent_tweak_mch_bone(self, i, tweak, entry):
         super().parent_tweak_mch_bone(i, tweak, entry)
         if not i == 0 and entry.seg_idx == 0:
-            prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
-            next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
-            self.align_bone(0, tweak, prev_org, None, next_org)
+            p, c, n = self.check_entry_targets(entry)
+            align_bone(self.obj, tweak, p, c, n)
 
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
@@ -202,7 +201,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             self.rig_tweak_mch_bone(*args)
 
     def rig_tweak_mch_bone(self, i, tweak, entry):
-        # Removed mechanics, only copy scale
+        '''Removed mechanics, only copy scale'''
         if not i == 0 and entry.seg_idx == 0:
             prev_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx - 1 ][0].org)
             next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
@@ -222,7 +221,7 @@ class BaseLimbBendyRig(BaseLimbRig):
 
     @stage.parent_bones
     def ease_deform_chain(self):
-        # (New) ease settings on edit bones need to bo set in parenting stage
+        '''(New) ease settings on edit bones need to bo set in parenting stage'''
         tweaks = pairwise_nozip(padnone(self.bones.ctrl.tweak))
         entries = pairwise_nozip(padnone(self.segment_table_full))
 
@@ -230,7 +229,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             self.ease_deform_bone(*args)
         
     def ease_deform_bone(self, i, deform, tweak, next_tweak, entry, next_entry):
-        # Sub loop function for bbone easing
+        '''Sub loop function for bbone easing'''
         pbone = self.get_bone(deform)
         pbone.bbone_handle_type_start = 'TANGENT'
         pbone.bbone_handle_type_end = 'TANGENT'
@@ -240,7 +239,7 @@ class BaseLimbBendyRig(BaseLimbRig):
         pbone.bbone_easeout = 1.0 if next_entry and next_entry.seg_idx else self.joints_ease
 
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
-        # Added copy scale constraint and bendy driver creation, excluded last deform segment
+        '''Added copy scale constraint and bendy driver creation, excluded last deform segment'''
         if tweak and not i == len(self.bones.deform) - 1:
             self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
             self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
@@ -256,7 +255,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             self.make_constraint(deform, 'COPY_TRANSFORMS', entry.org)
 
     def drivers_deform_bone(self, i, deform, stretch, entry, next_entry, tweak, next_tweak):
-        # New function to create bendy bone drivers
+        '''New function to create bendy bone drivers'''
         pbone = self.get_bone(deform)
         space = 'LOCAL_SPACE'
         v_type = 'TRANSFORMS'
@@ -513,7 +512,7 @@ class BaseLimbBendyRig(BaseLimbRig):
 
     @stage.configure_bones
     def configure_armature_display(self):
-        # New function to set rig viewport display
+        '''New function to set rig viewport display'''
         self.obj.data.display_type = 'BBONE'
 
     @classmethod

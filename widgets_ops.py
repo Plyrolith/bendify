@@ -292,7 +292,12 @@ class BENDIFY_OT_WidgetsEdit(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'POSE' and context.selected_pose_bones
+        return context.active_object \
+        and context.selected_objects \
+        and context.active_object.type == 'ARMATURE' \
+        and context.mode == 'POSE' \
+        and context.selected_pose_bones \
+        and len([obj for obj in context.selected_objects if obj.type == 'ARMATURE']) == 1
 
     def execute(self, context):
         return {'FINISHED'}

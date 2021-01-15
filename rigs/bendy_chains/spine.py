@@ -43,35 +43,16 @@ class Rig(SpineRig, BaseBendyRig):
 
     def initialize(self):
         self.rotation_mode_end = self.params.rotation_mode_end
+        self.master_control = 'NONE'
         super().initialize()
-        
-        #self.stretch_orgs_default = 0.0
 
     ####################################################
-    # Volume control
+    # Master control bone
 
-    @stage.generate_bones
-    def make_volume_control(self):
-        org = self.bones.org[self.pivot_pos]
-        self.bones.ctrl.volume = self.copy_bone(org, 'spine_volume')
-        self.copy_scale_bone = self.bones.ctrl.volume
-
-    @stage.parent_bones
-    def parent_volume_control(self):
-        self.set_bone_parent(self.bones.ctrl.volume, self.bones.ctrl.master)
-
-    @stage.configure_bones
-    def configure_volume_control(self):
-        bone = self.get_bone(self.bones.ctrl.volume)
-        bone.lock_location = (True, True, True)
-        bone.lock_rotation = (True, True, True)
-        bone.lock_rotation_w = True
-        bone.lock_scale = (False, True, False)
-
-    @stage.generate_widgets
-    def make_volume_control_widget(self):
-        bone = self.bones.ctrl.volume
-        create_gear_widget(self.obj, bone, size=4)
+    def make_master_control(self):
+        # Set master control as default prop bone
+        super().make_master_control()
+        self.default_prop_bone = self.bones.ctrl.master
 
     ####################################################
     # Main control bones
@@ -118,10 +99,16 @@ class Rig(SpineRig, BaseBendyRig):
     ####################################################
     # Deform bones
 
+    @stage.parent_bones
+    def parent_deform_chain(self):
+        ctrls = self.bones.ctrl
+        for deform, fk in zip(self.bones.deform, ctrls.fk.hips + ctrls.fk.chest):
+            self.set_bone_parent(deform, fk, use_connect=False)
+
     @stage.rig_bones
     def rig_deform_chain(self):
-        ctrl = self.bones.ctrl
-        for args in zip(count(0), self.bones.deform, ctrl.tweak, ctrl.tweak[1:], ctrl.fk.hips + ctrl.fk.chest):
+        ctrls = self.bones.ctrl
+        for args in zip(count(0), self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk.hips + ctrls.fk.chest):
             self.rig_deform_bone(*args)
 
     def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
@@ -136,9 +123,9 @@ class Rig(SpineRig, BaseBendyRig):
 
     @stage.parent_bones
     def parent_org_chain(self):
-        ctrl = self.bones.ctrl
+        ctrls = self.bones.ctrl
         orgs = self.bones.org
-        for fk, org in zip(ctrl.fk.hips + ctrl.fk.chest, orgs):
+        for fk, org in zip(ctrls.fk.hips + ctrls.fk.chest, orgs):
             self.set_bone_parent(org, fk)
 
     @stage.rig_bones
@@ -147,9 +134,9 @@ class Rig(SpineRig, BaseBendyRig):
         orgs = self.bones.org
         for args in zip(count(0), orgs, fk.hips + fk.chest):
             self.rig_org_bone(*args)
-
+    
     def rig_org_bone(self, i, org, target):
-        BaseBendyRig.rig_org_bone(self, i, org, target)
+        self.make_constraint(org, 'COPY_SCALE', target)
 
     ####################################################
     # SETTINGS
