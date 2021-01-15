@@ -101,7 +101,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         
         if hasattr(self, 'rigify_parent'):
             parent = self.rigify_parent
-            if parent and hasattr(parent.bones, 'mch') and hasattr(parent.bones.mch, 'tweak'):
+            if parent and self.incoming_tweak and hasattr(parent.bones, 'mch') and hasattr(parent.bones.mch, 'tweak'):
                 if self.get_bone_parent(self.incoming_tweak) in parent.bones.mch.tweak:
                     self.incoming_tweak_mch = self.get_bone_parent(self.incoming_tweak)
 

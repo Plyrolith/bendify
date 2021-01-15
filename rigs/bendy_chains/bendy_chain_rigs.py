@@ -54,7 +54,7 @@ class BaseBendyRig(TweakChainRig):
         self.bbone_chain_length = 0
         self.keep_axis = 'SWING_Y'
         
-        self.root_bone = self.rig_parent_bone if hasattr(self, 'rig_parent_bone') else "root"
+        self.root_bone = self.get_bone(self.bones.org[0]).parent.name if self.get_bone(self.bones.org[0]).parent else "root"
         self.default_prop_bone = None
 
     ####################################################
@@ -576,7 +576,6 @@ class ConnectingBendyRig(BaseBendyRig):
         self.tip_parent_bone = self.params.tip_parent_bone
         self.tip_scale = self.params.tip_scale
         self.tip_scale_uniform = self.params.tip_scale_uniform
-        self.incoming_parent = None
         self.incoming_tweak = None
         self.first_bone_matrix = None
         self.first_bone_length = None
@@ -585,7 +584,6 @@ class ConnectingBendyRig(BaseBendyRig):
         '''Find connection parent'''
         first_bone = self.get_bone(self.bones.org[0])
         if not self.incoming == 'NONE' and hasattr(self, 'rigify_parent') and self.rigify_parent:
-            self.incoming_parent = self.rigify_parent
             self.first_bone_matrix = first_bone.matrix
             self.first_bone_length = first_bone.length
 
@@ -698,27 +696,25 @@ class ConnectingBendyRig(BaseBendyRig):
     @stage.apply_bones
     def parent_tweak_mch_apply(self):
         '''Re-parent first and tip tweak MCH'''
-        if self.incoming_parent:
-            mch = self.bones.mch.tweak[0]
-            #self.get_bone(mch).inherit_scale = 'NONE'
+        mch = self.bones.mch.tweak[0]
+        parent = ['ATTACH', 'PARENT']
 
-            if self.incoming_tweak:
-                self.set_bone_parent(mch, self.incoming_tweak)
-                self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
-            
-            # If not tweak, parent to actual parent
-            elif self.incoming_parent:
-                self.set_bone_parent(mch, self.incoming_parent)
-            
-            # Without parent use root
-            else:
-                self.set_bone_parent(mch, self.root_bone)
+        if self.incoming_tweak:
+            self.set_bone_parent(mch, self.incoming_tweak)
+            self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
+        
+        # If not tweak, parent to actual parent
+        elif self.incoming in parent and hasattr(self, 'rigify_parent'):
+            self.set_bone_parent(mch, self.get_bone(self.bones.org[0]).parent.name)
+        
+        # Without parent use root
+        else:
+            self.set_bone_parent(mch, self.root_bone)
         
         # Re-parent tip tweak mch
         if self.tip_parent_bone and self.tip_parent_bone in self.obj.data.edit_bones:
             mch = self.bones.mch.tweak[-1]
             self.set_bone_parent(mch, self.tip_parent_bone)
-            #self.get_bone(mch).inherit_scale = 'NONE'
 
     ##############################
     # Settings
