@@ -26,7 +26,7 @@ from rigify.base_rig import stage
 from rigify.utils.naming import strip_org, make_derived_name
 from rigify.utils.misc import map_list
 from rigify.utils.layers import ControlLayersOption
-from rigify.utils.bones import align_bone_orientation, align_bone_roll, align_bone_x_axis, align_bone_y_axis, put_bone, set_bone_widget_transform
+from rigify.utils.bones import align_bone_orientation, align_bone_roll, align_bone_x_axis, align_bone_y_axis, copy_bone_position, put_bone, set_bone_widget_transform
 from rigify.utils.widgets_basic import create_circle_widget
 from rigify.rigs.widgets import create_ballsocket_widget, create_gear_widget
 
@@ -194,7 +194,7 @@ class BaseBendyRig(TweakChainRig):
 
     ##############################
     # ORG chain
-
+    
     @stage.parent_bones
     def parent_org_chain(self):
         '''Parent ORGs to FKs'''
@@ -579,121 +579,144 @@ class ConnectingBendyRig(BaseBendyRig):
         super().initialize()
 
         self.incoming = self.params.incoming
-        self.tip_parent_bone = self.params.tip_parent_bone
+        self.incoming_connect = self.params.incoming_connect
+        self.incoming_align = self.params.incoming_align
+        self.incoming_scale = self.params.incoming_scale
+        self.incoming_scale_uniform = self.params.incoming_scale_uniform
+        self.incoming_tweak = None
+        self.incoming_bone = None
+        self.incoming_parent = None
+
+        self.tip_bone = None
         self.tip_scale = self.params.tip_scale
         self.tip_scale_uniform = self.params.tip_scale_uniform
-        self.incoming_tweak = None
-        self.incoming_parent = None
-        self.first_bone_matrix = None
-        self.first_bone_length = None
-        self.first_bone_x_axis = None
-        self.first_bone_y_axis = None
-        
+
     def prepare_bones(self):
-        '''Find connection parent'''
-        first_bone = self.get_bone(self.bones.org[0])
-        if not self.incoming == 'NONE' and hasattr(self, 'rigify_parent') and self.rigify_parent:
-            self.incoming_parent = self.get_bone(self.bones.org[0]).parent.name
-
-            # Match position of first bone head if desired
-            match = ('PARENT', 'TWEAK', 'MERGE')
-            if self.incoming in match:
-
-                self.first_bone_matrix = first_bone.matrix
-                self.first_bone_length = first_bone.length
-                self.first_bone_x_axis = first_bone.x_axis
-                self.first_bone_y_axis = first_bone.y_axis
-
-                x_axis = first_bone.x_axis
-                d_head = (first_bone.head - first_bone.parent.head).length
-                d_tail = (first_bone.head - first_bone.parent.tail).length
-                if d_head < d_tail:
-                    first_bone.head = first_bone.parent.head
-                else:
-                    first_bone.head = first_bone.parent.tail
-                # Fix roll
-                align_bone_x_axis(self.obj, self.bones.org[0], x_axis)
+        '''Get parent bone'''
+        first_org_b = self.get_bone(self.bones.org[0])
+        if first_org_b.parent:
+            self.incoming_parent = first_org_b.parent.name
 
     ####################################################
     # Control chain
 
     @stage.parent_bones
-    def position_first_control(self):
-        '''Restore bone positions if first head was moved'''
-        if self.first_bone_matrix and self.first_bone_length:
-            if self.org_transform == 'FK':
-                first_org = self.get_bone(self.bones.org[0])
-                first_org.matrix = self.first_bone_matrix
-                first_org.length = self.first_bone_length
-            if hasattr(self.bones.ctrl, 'fk'):
-                first_fk = self.get_bone(self.bones.ctrl.fk[0])
-                first_fk.matrix = self.first_bone_matrix
-                first_fk.length = self.first_bone_length
-            if hasattr(self.bones.mch, 'fk'):
-                first_mch = self.get_bone(self.bones.mch.fk[0])
-                first_mch.matrix = self.first_bone_matrix
-                first_mch.length = self.first_bone_length
-            if hasattr(self.bones.ctrl, 'master'):
-                master = self.get_bone(self.bones.ctrl.master)
-                master.matrix = self.first_bone_matrix
-                master.length = self.first_bone_length
-            #Align tip with original position if chain has only one segment
-            if len(self.bones.org) == 1:
-                align_bone_y_axis(self.obj, self.bones.mch.tweak[-1], self.first_bone_y_axis)
-                align_bone_x_axis(self.obj, self.bones.mch.tweak[-1], self.first_bone_x_axis)
-                align_bone_y_axis(self.obj, self.bones.ctrl.tweak[-1], self.first_bone_y_axis)
-                align_bone_x_axis(self.obj, self.bones.ctrl.tweak[-1], self.first_bone_x_axis)
+    def set_incoming_connection(self):
+        '''Check if connecting parents exist and move tweaks'''
+        first_org = self.bones.org[0]
+        first_org_b = self.get_bone(first_org)
+
+        first_tweak = self.bones.ctrl.tweak[0]
+        first_tweak_mch = self.bones.mch.tweak[0]
+
+        x_axis = first_org_b.x_axis
+        connect = None
+        align = None
+
+        # Incoming tweak
+        parent = None
+        if hasattr(self, 'rigify_parent') and self.rigify_parent:
+            parent = self.rigify_parent
+
+        if self.incoming == 'TWEAK' and parent and hasattr(parent.bones, 'ctrl') and hasattr(parent.bones.ctrl, 'tweak'):
+            parent_tweaks = parent.bones.ctrl.tweak
+            delta = distance(self.obj, first_org, parent_tweaks[0])
+            self.incoming_tweak = parent_tweaks[0]
+            for tweak in parent_tweaks:
+                dist = distance(self.obj, first_org, tweak)
+                if dist < delta:
+                    delta = dist
+                    self.incoming_tweak = tweak
+            
+            bone_in = self.get_bone(self.incoming_tweak)
+
+            if self.incoming_connect:
+                connect = bone_in.head
+            
+            if self.incoming_align:
+                roll = self.incoming_tweak
+                if self.incoming_tweak == parent_tweaks[0]:
+                    align = bone_in.head - bone_in.tail
+
+                elif self.incoming_tweak == parent_tweaks[-1]:
+                    align = bone_in.tail - bone_in.head
+
+        # Incoming bone
+        elif self.incoming == 'BONE' and self.params.incoming_bone and self.params.incoming_bone in self.obj.data.edit_bones:
+            self.incoming_bone = self.params.incoming_bone
+            bone_in = self.get_bone(self.incoming_bone)
+
+            if self.incoming_connect:
+                connect = bone_in.head
+            
+            if self.incoming_align:
+                roll = self.incoming_bone
+                align = bone_in.tail - bone_in.head
+        
+        # Incoming parent
+        elif self.incoming_parent:
+            if self.incoming_connect or self.incoming_align:
+                parent_bone = self.get_bone(self.incoming_parent)
+                d_head = (first_org_b.head - parent_bone.head).length
+                d_tail = (first_org_b.head - parent_bone.tail).length
+                head = True if d_head < d_tail else False
+
+            if self.incoming_connect:
+                connect = parent_bone.head if head else parent_bone.tail
+            
+            if self.incoming_align:
+                align = parent_bone.tail - parent_bone.head if head else parent_bone.head - parent_bone.tail
+                roll = self.incoming_parent
+
+        # Connect
+        if connect:
+            first_def = self.bones.deform[0]
+            first_def_b = self.get_bone(first_def)
+            first_def_b.head = connect
+            align_bone_x_axis(self.obj, first_def, x_axis)
+            copy_bone_position(self.obj, first_def, first_tweak_mch, length=self.get_bone(first_tweak_mch).length)
+            copy_bone_position(self.obj, first_def, first_tweak, length=self.get_bone(first_tweak).length)
+
+        # Align
+        if align:
+            align_bone_y_axis(self.obj, first_tweak_mch, align)
+            align_bone_roll(self.obj, first_tweak_mch, roll)
+            copy_bone_position(self.obj, first_tweak_mch, first_tweak)
+
+        # Tip
+        if self.params.tip_bone and self.params.tip_bone in self.obj.data.edit_bones:
+            self.tip_bone = self.params.tip_bone
 
     ####################################################
     # Tweak chain
-
-    @stage.parent_bones
-    def check_incoming_tweak(self):
-        '''Check for nearest Tweak of parent and move first org head there'''
-        move = ('TWEAK', 'MERGE')
-        first_bone = self.bones.org[0]
-        if self.incoming in move and hasattr(self, 'rigify_parent'):
-            parent = self.rigify_parent
-            if parent and hasattr(parent.bones, 'ctrl') and hasattr(parent.bones.ctrl, 'tweak'):
-                parent_tweaks = parent.bones.ctrl.tweak
-                delta = distance(self.obj, first_bone, parent_tweaks[0])
-                self.incoming_tweak = parent_tweaks[0]
-                for tweak in parent_tweaks:
-                    dist = distance(self.obj, first_bone, tweak)
-                    if dist < delta:
-                        delta = dist
-                        self.incoming_tweak = tweak
-                
-                # Merge align
-                if self.incoming_tweak and self.incoming == 'MERGE':
-                    bone_in = self.get_bone(self.incoming_tweak)
-                    first_tweak = self.bones.ctrl.tweak[0]
-                    first_tweak_mch = self.bones.mch.tweak[0]
-
-                    if self.incoming_tweak == parent_tweaks[0]:
-                        vec = bone_in.head - bone_in.tail
-
-                    elif self.incoming_tweak == parent_tweaks[-1]:
-                        vec = bone_in.tail - bone_in.head
-
-                    align_bone_y_axis(self.obj, first_tweak, vec)
-                    align_bone_y_axis(self.obj, first_tweak_mch, vec)
-                    align_bone_roll(self.obj, first_tweak, self.incoming_tweak)
-                    align_bone_roll(self.obj, first_tweak_mch, self.incoming_tweak)
-
+    
     @stage.rig_bones
     def rig_tweak_chain(self):
         '''Copy scale offset for connected tweak'''
-        if self.incoming_tweak and self.incoming == 'MERGE':
-            if len(self.rigify_parent.bones.ctrl.tweak) > 1:
-                self.make_constraint(self.bones.ctrl.tweak[0], 'COPY_SCALE', self.incoming_tweak, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+        if self.incoming_tweak or self.incoming_bone:
+            make_incoming_scale = self.incoming_scale
+        else:
+            make_incoming_scale = False
+
+        if make_incoming_scale:
+            use_make_uniform = True if self.incoming == 'TWEAK' else self.incoming_scale_uniform
+
+            self.make_constraint(
+                self.bones.ctrl.tweak[0],
+                'COPY_SCALE',
+                self.incoming_tweak or self.incoming_bone,
+                use_make_uniform=use_make_uniform,
+                use_offset=True,
+                target_space='LOCAL',
+                owner_space='LOCAL'
+            )
 
         # Tip scale offset
-        if self.tip_parent_bone and self.tip_parent_bone in self.obj.pose.bones:
+        if self.tip_bone:
             self.make_constraint(
                 self.bones.ctrl.tweak[-1],
                 'COPY_SCALE',
-                self.tip_parent_bone,
+                self.tip_bone,
                 use_make_uniform=self.tip_scale_uniform,
                 use_offset=True,
                 target_space='LOCAL',
@@ -723,7 +746,10 @@ class ConnectingBendyRig(BaseBendyRig):
         if self.incoming_tweak:
             # Parent first tweak MCH to incoming tweak
             self.set_bone_parent(mch, self.incoming_tweak)
-            #self.get_bone(self.incoming_tweak).length = self.get_bone(mch).length
+        
+        elif self.incoming_bone:
+            # Parent to specified bone
+            self.set_bone_parent(mch, self.incoming_bone)
         
         elif self.incoming_parent:
             # If not tweak, parent to actual parent
@@ -734,9 +760,8 @@ class ConnectingBendyRig(BaseBendyRig):
             self.set_bone_parent(mch, self.root_bone)
         
         # Re-parent tip tweak mch
-        if self.tip_parent_bone and self.tip_parent_bone in self.obj.data.edit_bones:
-            mch = self.bones.mch.tweak[-1]
-            self.set_bone_parent(mch, self.tip_parent_bone)
+        if self.tip_bone:
+            self.set_bone_parent(self.bones.mch.tweak[-1], self.tip_bone)
 
     ##############################
     # Settings
@@ -748,23 +773,46 @@ class ConnectingBendyRig(BaseBendyRig):
         params.incoming = bpy.props.EnumProperty(
             items=[
                 ('NONE', "Free", "Free"),
-                ('ATTACH', "Attach to Parent", "Attach first tweak to parent without moving"),
-                ('PARENT', "Connect to Parent", "Connect first tweak to parent"),
-                ('TWEAK', "Connect to Tweak", "Connect to closest parent tweak"),
-                ('MERGE', "Merge Tweaks & Align", "Merge with closest parent tweak and align for a smooth curve")
+                ('PARENT', "To Parent", "Connect first tweak to parent"),
+                ('TWEAK', "Merge Tweaks", "Merge with closest parent tweak"),
+                ('BONE', "Define Bone", "Specify parent for first tweak by name"),
             ],
             name="First Tweak",
             default='NONE',
             description="Connection point for the first tweak of the B-Bone chain"
         )
 
-        params.incoming_tweak = bpy.props.BoolProperty(
-            name="Connect Tweaks",
-            default=False,
-            description="Connect the B-Bone chain to the nearest parent tweak"
+        params.incoming_connect = bpy.props.BoolProperty(
+            name="Connect First",
+            default=True,
+            description="Move first tweak to its parent"
         )
 
-        params.tip_parent_bone = bpy.props.StringProperty(
+        params.incoming_align = bpy.props.BoolProperty(
+            name="Align First",
+            default=True,
+            description="Align first tweak to its parent for a smooth curve"
+        )
+
+        params.incoming_bone = bpy.props.StringProperty(
+            name="First Parent",
+            default="",
+            description="Parent for the first tweak"
+        )
+
+        params.incoming_scale = bpy.props.BoolProperty(
+            name="First Scale Offset",
+            default=True,
+            description="Add copy scale constraint to first tweak, offsetting it by its parent's scale"
+        )
+
+        params.incoming_scale_uniform = bpy.props.BoolProperty(
+            name="Make Uniform",
+            default=False,
+            description="Make first tweak scale offset uniform"
+        )
+
+        params.tip_bone = bpy.props.StringProperty(
             name="Tip Parent",
             default="",
             description="Parent for the tip tweak; leave empty for regular chain hierarchy"
@@ -785,16 +833,36 @@ class ConnectingBendyRig(BaseBendyRig):
     @classmethod
     def parameters_ui(self, layout, params):
         layout.row().prop(params, 'incoming')
-        layout.row().prop(params, 'tip_parent_bone')
+
+        if params.incoming == 'BONE':
+            layout.row().prop(params, 'incoming_bone')
+
+        if not params.incoming == 'NONE':
+            r = layout.row(align=True)
+            r.prop(params, 'incoming_connect', toggle=True)
+            r.prop(params, 'incoming_align', toggle=True)
+            if params.incoming == 'BONE' and not params.incoming_bone:
+                r.enabled = False
+        
+        if params.incoming == 'BONE' or params.incoming == 'TWEAK':
+            split = layout.split(align=True)
+            r = split.row(align=True)
+            r.prop(params, 'incoming_scale', toggle=True)
+            r = split.row(align=True)
+            r.prop(params, 'incoming_scale_uniform', toggle=True)
+            if not params.incoming_scale:
+                r.enabled = False
+
+        layout.row().prop(params, 'tip_bone')
 
         split = layout.split(align=True)
         r = split.row(align=True)
         r.prop(params, 'tip_scale', toggle=True)
-        if not params.tip_parent_bone:
+        if not params.tip_bone:
             r.enabled = False
         r = split.row(align=True)
         r.prop(params, 'tip_scale_uniform', toggle=True)
-        if not params.tip_parent_bone or not params.tip_scale:
+        if not params.tip_bone or not params.tip_scale:
             r.enabled = False
         super().parameters_ui(layout, params)
 
@@ -842,7 +910,7 @@ class MasterControlBendyRig(BaseBendyRig):
             bone = ctrls.master
             if self.master_control == 'ROTATION':
                 create_ballsocket_widget(self.obj, bone, size=0.7)
-                transform = ctrls.fk[-1] if self.tip_parent_bone else ctrls.tweak[-1]
+                transform = ctrls.fk[-1] if self.tip_bone else ctrls.tweak[-1]
             else:
                 create_gear_widget(self.obj, bone, size=4)
                 transform = ctrls.fk[0]

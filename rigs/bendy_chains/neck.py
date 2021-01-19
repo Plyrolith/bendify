@@ -46,12 +46,14 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     def initialize(self):
         '''Don't use basic connection; bendy init, neck checks'''
         self.create_head_def = self.params.create_head_def
+
+        # Deactivate
         self.use_connect_chain = False
         self.connected_tweak = None
-        self.incoming_tweak_mch = None
 
         ConnectingBendyRig.initialize(self)
 
+        self.incoming_tweak_mch = None
         self.long_neck = len(self.bones.org) > 3
         self.has_neck = len(self.bones.org) > 1
         self.rotation_bones = []
@@ -95,9 +97,9 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     # Incoming Tweak
 
     @stage.parent_bones
-    def check_incoming_tweak(self):
+    def set_incoming_connection(self):
         '''Get incoming tweak mch, if existing'''
-        ConnectingBendyRig.check_incoming_tweak(self)
+        ConnectingBendyRig.set_incoming_connection(self)
         
         if hasattr(self, 'rigify_parent'):
             parent = self.rigify_parent
