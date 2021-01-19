@@ -665,7 +665,7 @@ class ConnectingBendyRig(BaseBendyRig):
                 connect = parent_bone.head if head else parent_bone.tail
             
             if self.incoming_align:
-                align = parent_bone.tail - parent_bone.head if head else parent_bone.head - parent_bone.tail
+                align = parent_bone.head - parent_bone.tail if head else parent_bone.tail - parent_bone.head
                 roll = self.incoming_parent
 
         # Connect
@@ -848,9 +848,11 @@ class ConnectingBendyRig(BaseBendyRig):
             split = layout.split(align=True)
             r = split.row(align=True)
             r.prop(params, 'incoming_scale', toggle=True)
+            if params.incoming == 'BONE' and not params.incoming_bone:
+                r.enabled = False
             r = split.row(align=True)
             r.prop(params, 'incoming_scale_uniform', toggle=True)
-            if not params.incoming_scale:
+            if params.incoming == 'BONE' and not params.incoming_bone or not params.incoming_scale:
                 r.enabled = False
 
         layout.row().prop(params, 'tip_bone')
