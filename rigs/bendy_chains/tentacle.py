@@ -27,11 +27,11 @@ from rigify.utils.bones import put_bone, set_bone_widget_transform
 from rigify.utils.misc import map_list
 from rigify.utils.naming import strip_org, make_derived_name
 
-from .bendy_chain_rigs import SegmentedBendyRig, ConnectingBendyRig, MasterControlBendyRig, ParentSwitchBendyRig
+from .bendy_chain_rigs import SegmentedBendyRig, ConnectingBendyRig, MasterControlBendyRig, ParentSwitchBendyRig, ComplexStretchBendyRig
 
 from ...utils.misc import threewise_nozip
 
-class Rig(MasterControlBendyRig, SegmentedBendyRig, ConnectingBendyRig):
+class Rig(MasterControlBendyRig, SegmentedBendyRig, ConnectingBendyRig, ComplexStretchBendyRig):
     """
     Bendy tentacle
     """

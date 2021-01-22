@@ -65,8 +65,8 @@ class BaseBendyRig(TweakChainRig):
         ctrls = self.bones.ctrl
         master = self.default_prop_bone
         panel = self.script.panel_with_selected_check(self, ctrls.flatten())
-        self.make_property(master, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
-        panel.custom_prop(master, 'volume_variation', text='Volume Variation', slider=True)
+        self.make_property(master, 'volume_deform', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
+        panel.custom_prop(master, 'volume_deform', text='Deform Volume Variation', slider=True)
 
     ##############################
     # Control chain
@@ -128,7 +128,6 @@ class BaseBendyRig(TweakChainRig):
     def parent_tweak_mch_bone(self, i, mch, parent):
         '''Parent tweak MCH'''
         self.set_bone_parent(mch, parent)
-        self.get_bone(mch).inherit_scale = 'NONE'
 
     @stage.parent_bones
     def align_tweak_mch_chain(self):
@@ -153,6 +152,7 @@ class BaseBendyRig(TweakChainRig):
         '''Constraints to calculate tangent rotation between previous and next chain targets'''
         if prev_target and next_target:
             self.make_constraint(mch, 'COPY_LOCATION', prev_target)
+            #self.make_constraint(mch, 'DAMPED_TRACK', next_target)
             self.make_constraint(mch, 'STRETCH_TO', next_target, bulge=0, volume='NO_VOLUME', keep_axis=self.keep_axis)
             self.make_constraint(mch, 'COPY_LOCATION', curr_target)
         self.make_constraint(mch, 'COPY_SCALE', scale_bone, use_make_uniform=True)
@@ -194,29 +194,32 @@ class BaseBendyRig(TweakChainRig):
 
     ##############################
     # ORG chain
-    
+
     @stage.parent_bones
     def parent_org_chain(self):
-        '''Parent ORGs to FKs'''
-        for org, fk in zip(self.bones.org, self.bones.ctrl.fk):
-            self.set_bone_parent(org, fk)
+        self.parent_bone_chain(self.bones.org, use_connect=False)
+        self.set_bone_parent(self.bones.org[0], self.root_bone)
 
     @stage.rig_bones
     def rig_org_chain(self):
         '''Set ORG transformation according to rig setting'''
         ctrls = self.bones.ctrl
-        for org, deform, tweak, next_tweak in zip(self.bones.org, self.bones.deform, ctrls.tweak, ctrls.tweak[1:]): #, ctrls.fk):
-            if self.org_transform == 'TWEAKS':
-                self.make_constraint(org, 'COPY_TRANSFORMS', deform)
-                self.make_constraint(org, 'COPY_SCALE', tweak, use_y=False, power=0.5, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
-                self.make_constraint(org, 'COPY_SCALE', next_tweak, use_y=False, power=0.5, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
-            elif self.org_transform == 'TWEAK':
-                self.make_constraint(org, 'COPY_TRANSFORMS', deform)
-                self.make_constraint(org, 'COPY_SCALE', tweak, use_y=False, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
-            elif self.org_transform == 'DEF':
-                self.make_constraint(org, 'COPY_TRANSFORMS', deform)
-            #elif self.org_transform == 'FK':
-            #    self.make_constraint(org, 'COPY_TRANSFORMS', fk)
+        for org, deform, tweak, next_tweak, fk in zip(self.bones.org, self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
+            self.rig_org_bone(org, deform, tweak, next_tweak, fk)
+            
+    def rig_org_bone(self, org, deform, tweak, next_tweak, fk):
+        '''ORG bone constraint loop'''
+        if self.org_transform == 'TWEAKS':
+            self.make_constraint(org, 'COPY_TRANSFORMS', deform)
+            self.make_constraint(org, 'COPY_SCALE', tweak, use_y=False, power=0.5, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+            self.make_constraint(org, 'COPY_SCALE', next_tweak, use_y=False, power=0.5, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+        elif self.org_transform == 'TWEAK':
+            self.make_constraint(org, 'COPY_TRANSFORMS', deform)
+            self.make_constraint(org, 'COPY_SCALE', tweak, use_y=False, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+        elif self.org_transform == 'DEF':
+            self.make_constraint(org, 'COPY_TRANSFORMS', deform)
+        elif self.org_transform == 'FK':
+            self.make_constraint(org, 'COPY_TRANSFORMS', fk)
 
     ####################################################
     # Deform bones
@@ -227,11 +230,18 @@ class BaseBendyRig(TweakChainRig):
         super().make_deform_chain()
         self.bbone_chain_length = len(self.bones.deform) - 1
 
+    """
     @stage.parent_bones
     def parent_deform_chain(self):
         '''Parent DEFs to FKs'''
         for deform, fk in zip(self.bones.deform, self.bones.ctrl.fk):
             self.set_bone_parent(deform, fk)
+    """
+
+    @stage.parent_bones
+    def parent_deform_chain(self):
+        super().parent_deform_chain()
+        self.set_bone_parent(self.bones.deform[0], self.root_bone)
 
     @stage.parent_bones
     def ease_deform_chain(self):
@@ -241,14 +251,14 @@ class BaseBendyRig(TweakChainRig):
         for args in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
             self.ease_deform_bone(*args)
         
-    def ease_deform_bone(self, i, deform, tweak, next_tweak):
+    def ease_deform_bone(self, i, bone, handle_start, handle_end):
         '''Easing per bone'''
-        pbone = self.get_bone(deform)
+        pbone = self.get_bone(bone)
         pbone.bbone_segments = self.bbone_segments
         pbone.bbone_handle_type_start = 'TANGENT'
         pbone.bbone_handle_type_end = 'TANGENT'
-        pbone.bbone_custom_handle_start = self.get_bone(tweak)
-        pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
+        pbone.bbone_custom_handle_start = self.get_bone(handle_start)
+        pbone.bbone_custom_handle_end = self.get_bone(handle_end)
         pbone.bbone_easein = 0.0 if i == 0 and not self.bbone_easein else 1.0
         pbone.bbone_easeout = 0.0 if i == self.bbone_chain_length and not self.bbone_easeout else 1.0
 
@@ -259,24 +269,35 @@ class BaseBendyRig(TweakChainRig):
         for args in zip(count(0), self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
             self.rig_deform_bone(*args)
     
-    def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
+    def rig_deform_bone(self, i, bone, handle_start, handle_end, scale=None):
         '''DEF constraints'''
-        self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
-        self.make_constraint(deform, 'COPY_SCALE', fk)
-        self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
-        stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
-        self.drivers_deform_bone(i, deform, stretch, tweak, next_tweak)
+        self.transform_deform_bone(bone, handle_start)
+        if scale:
+            self.scale_deform_bone(bone, scale)
+        self.track_deform_bone(bone, handle_end)
+        self.stretch_bone(bone, handle_end, 'volume_deform')
 
-    def drivers_deform_bone(self, i, deform, stretch, tweak, next_tweak):
+        self.bendy_drivers(bone, handle_start, handle_end)
+
+    def transform_deform_bone(self, bone, target):
+        self.make_constraint(bone, 'COPY_LOCATION', target)
+        #self.make_constraint(bone, 'COPY_ROTATION', target)
+    
+    def scale_deform_bone(self, bone, target):
+        self.make_constraint(bone, 'COPY_SCALE', target, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+
+    def track_deform_bone(self, bone, target):
+        self.make_constraint(bone, 'DAMPED_TRACK', target)
+
+    def stretch_bone(self, bone, target, volume_property):
+        stretch = self.make_constraint(bone, 'STRETCH_TO', target)
+        self.make_driver(stretch, 'bulge', variables=[(self.default_prop_bone, volume_property)])
+
+    def bendy_drivers(self, bone, handle_start, handle_end):
         '''New function to create bendy bone drivers'''
-        pbone = self.get_bone(deform)
+        pbone = self.get_bone(bone)
         space = 'LOCAL_SPACE'
         v_type = 'TRANSFORMS'
-
-        ####################################################
-        # Volume Variation
-
-        self.make_driver(stretch, 'bulge', variables=[(self.default_prop_bone, 'volume_variation')])
 
         ####################################################
         # Easing
@@ -292,7 +313,7 @@ class BaseBendyRig(TweakChainRig):
                     [
                         {
                             'id': self.obj,
-                            'bone_target': tweak,
+                            'bone_target': handle_start,
                             'transform_type': 'SCALE_Y',
                             'transform_space': space,
                         }
@@ -312,7 +333,7 @@ class BaseBendyRig(TweakChainRig):
                     [
                         {
                             'id': self.obj,
-                            'bone_target': next_tweak,
+                            'bone_target': handle_end,
                             'transform_type': 'SCALE_Y',
                             'transform_space': space,
                         }
@@ -334,7 +355,7 @@ class BaseBendyRig(TweakChainRig):
                     [
                         {
                             'id': self.obj,
-                            'bone_target': tweak,
+                            'bone_target': handle_start,
                             'transform_type': 'SCALE_X',
                             'transform_space': space,
                         }
@@ -353,7 +374,7 @@ class BaseBendyRig(TweakChainRig):
                     [
                         {
                             'id': self.obj,
-                            'bone_target': next_tweak,
+                            'bone_target': handle_end,
                             'transform_type': 'SCALE_X',
                             'transform_space': space,
                         }
@@ -375,7 +396,7 @@ class BaseBendyRig(TweakChainRig):
                     [
                         {
                             'id': self.obj,
-                            'bone_target': tweak,
+                            'bone_target': handle_start,
                             'transform_type': 'SCALE_Z',
                             'transform_space': space,
                         }
@@ -394,7 +415,7 @@ class BaseBendyRig(TweakChainRig):
                     [
                         {
                             'id': self.obj,
-                            'bone_target': next_tweak,
+                            'bone_target': handle_end,
                             'transform_type': 'SCALE_Z',
                             'transform_space': space,
                         }
@@ -402,6 +423,21 @@ class BaseBendyRig(TweakChainRig):
                 }
             }
         )
+
+    ####################################################
+    # UI
+
+    def rotation_mode_tweak_ui(self, layout, params):
+        layout.row().prop(params, 'rotation_mode_tweak', text="Tweaks")
+    
+    def org_transform_ui(self, layout, params):
+        layout.row().prop(params, 'org_transform', text="ORGs")
+
+    def bbones_ui(self, layout, params):
+        layout.row().prop(params, 'bbones_spine')
+        r = layout.row(align=True)
+        r.prop(params, 'bbones_easein', text="Ease In", toggle=True)
+        r.prop(params, 'bbones_easeout', text="Ease Out", toggle=True)
 
     ####################################################
     # SETTINGS
@@ -446,13 +482,13 @@ class BaseBendyRig(TweakChainRig):
         params.bbones_easein = bpy.props.BoolProperty(
             name="B-Bone Ease In",
             default=True,
-            description="B-Bone Easing in for First Bone of Chain"
+            description="Deform easing in for first bone of chain"
         )
 
         params.bbones_easeout = bpy.props.BoolProperty(
             name="B-Bone Ease Out",
             default=True,
-            description="B-Bone Easing out for Last Bone of Chain"
+            description="Deform easing out for last bone of chain"
         )
 
         params.org_transform = bpy.props.EnumProperty(
@@ -463,38 +499,129 @@ class BaseBendyRig(TweakChainRig):
                 ('TWEAK', "Single Tweak", "Single Tweak"),
                 ('TWEAKS', "Between Tweaks", "BetweenTweaks"),
             ],
-            default='FK',
+            default='DEF',
             description="Source of ORG transformation; useful to determine children's behaviour"
         )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        '''More modes'''
-        layout.row().prop(params, 'rotation_mode_tweak', text="Tweaks")
-        layout.row().prop(params, 'org_transform', text="ORGs")
-        layout.row().prop(params, 'bbones_spine')
-
-        r = layout.row(align=True)
-        r.prop(params, 'bbones_easein', text="Ease In", toggle=True)
-        r.prop(params, 'bbones_easeout', text="Ease Out", toggle=True)
-
+        self.rotation_mode_tweak_ui(self, layout, params)
+        self.org_transform_ui(self, layout, params)
+        self.bbones_ui(self, layout, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 
 # Combine between the following
+
+class ComplexStretchBendyRig(BaseBendyRig):
+    """
+    Bendy rig with copied stretch constraints for better non-uniform scalability
+    """
+
+    def initialize(self):
+        super().initialize()
+
+        self.complex_stretch = self.params.complex_stretch
+    
+    ####################################################
+    # Deform MCH
+
+    @stage.generate_bones
+    def make_deform_mch_chain(self):
+        if self.complex_stretch:
+            self.bones.mch.deform = map_list(self.make_deform_mch_bone, count(0), self.bones.org)
+
+    def make_deform_mch_bone(self, i, org):
+        name = self.copy_bone(org, make_derived_name(org, 'mch', "_deform"), parent=True)
+        return name
+
+    @stage.parent_bones
+    def parent_deform_mch_chain(self):
+        if self.complex_stretch:
+            self.parent_bone_chain(self.bones.mch.deform, use_connect=True)
+            self.set_bone_parent(self.bones.mch.deform[0], self.root_bone)
+
+    @stage.apply_bones
+    def apply_deform_mch_chain(self):
+        if self.complex_stretch:
+            for deform, mch in zip(self.bones.deform, self.bones.mch.deform):
+                copy_bone_position(self.obj, deform, mch)
+                self.set_bone_parent(mch, self.get_bone_parent(deform))
+
+    @stage.rig_bones
+    def rig_deform_mch_chain(self):
+        if self.complex_stretch:
+            ctrls = self.bones.ctrl
+            for args in zip(count(0), self.bones.mch.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
+                self.rig_deform_mch_bone(*args)
+
+    def rig_deform_mch_bone(self, i, bone, handle_start, handle_end, scale=None):
+        if self.complex_stretch:
+            self.transform_deform_bone(bone, handle_start)
+            if scale:
+                self.scale_deform_bone(bone, scale)
+            #self.track_deform_bone(bone, handle_end)
+            self.stretch_bone(bone, handle_end, 'volume_deform')
+
+    ####################################################
+    # Deform bones
+
+    def rig_deform_bone(self, i, bone, handle_start, handle_end, scale=None):
+        if self.complex_stretch:
+            self.transform_deform_bone(bone, handle_start)
+            #if scale:
+            #    self.scale_deform_bone(bone, scale)
+            self.track_deform_bone(bone, handle_end)
+            
+            mch = self.bones.mch.deform[i]
+            self.make_constraint(bone, 'COPY_SCALE', mch)
+
+            self.bendy_drivers(bone, handle_start, handle_end)
+        else:
+            super().rig_deform_bone(i, bone, handle_start, handle_end, scale)
+
+    ####################################################
+    # UI
+
+    def complex_stretch_ui(self, layout, params):
+        layout.row().prop(params, "complex_stretch", toggle=True)
+
+    ####################################################
+    # SETTINGS
+
+    @classmethod
+    def add_parameters(self, params):
+        super().add_parameters(params)
+
+        params.complex_stretch = bpy.props.BoolProperty(
+            name="Complex Stretch Mechanics",
+            description="Additional mechanical layer to separate stretch matrix and enable better non-uniform scaling",
+            default=False
+            )
+
+    @classmethod
+    def parameters_ui(self, layout, params):
+        self.complex_stretch_ui(self, layout, params)
+        super().parameters_ui(layout, params)
+
 
 class SegmentedBendyRig(BaseBendyRig):
     """
     Bendy chain with indivdually scaling fk segments
     """
 
+    def initialize(self):
+        super().initialize()
+
+        self.segmented_fk = self.params.segmented_fk
+
     ##############################
     # Utilities
 
     def copy_scale_bone(self):
-        if hasattr(self.bones.ctrl, 'master'):
-            return self.bones.ctrl.master
-        elif hasattr(self.bones.mch, 'rot'):
+        #if hasattr(self.bones.ctrl, 'master'):
+        #    return self.bones.ctrl.master
+        if hasattr(self.bones.mch, 'rot'):
             return self.bones.mch.rot
         elif hasattr(self.bones.mch, 'parent'):
             return self.bones.mch.parent
@@ -506,8 +633,11 @@ class SegmentedBendyRig(BaseBendyRig):
 
     @stage.parent_bones
     def parent_control_chain(self):
-        for fk, parent in zip(self.bones.ctrl.fk, self.bones.mch.fk):
-            self.set_bone_parent(fk, parent)
+        if self.segmented_fk:
+            for fk, parent in zip(self.bones.ctrl.fk, self.bones.mch.fk):
+                self.set_bone_parent(fk, parent)
+        else:
+            super().parent_control_chain()
 
     ####################################################
     # FK MCH chain
@@ -515,7 +645,8 @@ class SegmentedBendyRig(BaseBendyRig):
     @stage.generate_bones
     def make_fk_mch_chain(self):
         # Create (new) mch bones for controllers
-        self.bones.mch.fk = map_list(self.make_fk_mch_bone, count(0), self.bones.org)
+        if self.segmented_fk:
+            self.bones.mch.fk = map_list(self.make_fk_mch_bone, count(0), self.bones.org)
 
     def make_fk_mch_bone(self, i, org):
         # FK mch creation loop
@@ -526,18 +657,22 @@ class SegmentedBendyRig(BaseBendyRig):
 
     @stage.parent_bones
     def parent_fk_mch_chain(self):
-        for mch, parent in zip(self.bones.mch.fk, [self.root_bone] + self.bones.ctrl.fk):
-            self.set_bone_parent(mch, parent, inherit_scale='NONE')
+        if self.segmented_fk:
+            for mch, parent in zip(self.bones.mch.fk, [self.root_bone] + self.bones.ctrl.fk):
+                self.set_bone_parent(mch, parent)
 
     @stage.rig_bones
     def rig_fk_mch_chain(self):
-        ctrls = self.bones.ctrl
-        for mch in self.bones.mch.fk:
-            self.make_constraint(mch, 'COPY_SCALE', self.root_bone)
+        if self.segmented_fk:
+            ctrls = self.bones.ctrl
+            mchs = self.bones.mch
+            for mch, fk in zip(mchs.fk, [None] + ctrls.fk):
+                if fk:
+                    self.make_constraint(mch, 'COPY_SCALE', fk, power=-1, space='LOCAL')
 
-            # Add master control constraint if necessary
-            if hasattr(self, 'master_control') and self.master_control == 'ROTATION' and len(ctrls.fk) > 1:
-                self.make_constraint(mch, 'COPY_ROTATION', ctrls.master, space='LOCAL')
+                # Add master control constraint if necessary
+                if hasattr(self, 'master_control') and self.master_control and len(ctrls.fk) > 1:
+                    self.make_constraint(mch, 'COPY_ROTATION', ctrls.master, space='LOCAL')
 
     ####################################################
     # Tweak MCH chain
@@ -545,29 +680,63 @@ class SegmentedBendyRig(BaseBendyRig):
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
         # Create tweak mch constraints
-        mch = self.bones.mch
-        targets = self.check_mch_targets()
+        if self.segmented_fk:
+            mch = self.bones.mch
+            targets = self.check_mch_targets()
 
-        for i, mch, p, c, n in zip(count(0), mch.tweak, *targets):
-            self.rig_tweak_mch_bone(i, mch, self.copy_scale_bone() or self.root_bone, p, c, n)
+            for i, mch, p, c, n in zip(count(0), mch.tweak, *targets):
+                self.rig_tweak_mch_bone(i, mch, self.copy_scale_bone() or self.root_bone, p, c, n)
+        else:
+            super().rig_tweak_mch_chain()
 
     ####################################################
     # Deform bones
 
-    def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
-        # Constraints/drivers for segmented scaling
-        self.make_constraint(deform, 'COPY_TRANSFORMS', tweak)
-        self.make_constraint(deform, 'COPY_SCALE', self.copy_scale_bone() or self.root_bone)
-        counter_volume = self.make_constraint(deform, 'COPY_SCALE', fk, use_offset=True, use_y=False, target_space='LOCAL', owner_space='LOCAL')
-        self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
-        stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
-        self.drivers_deform_bone(i, deform, stretch, tweak, next_tweak)
+    def scale_deform_bone(self, deform, target):
+        if self.segmented_fk:
+            counter_volume = self.make_constraint(
+                deform, 'COPY_SCALE', target, use_offset=True,
+                use_y=False, target_space='LOCAL', owner_space='LOCAL'
+            )
+            self.make_driver(
+                counter_volume, 'power', expression='1 - var * 0.5',
+                variables=[(self.default_prop_bone, 'volume_deform')]
+            )
+        else:
+            super().scale_deform_bone(deform, target)
+    
+    @stage.apply_bones
+    def fix_deform_shear(self):
+        if self.segmented_fk:
+            for deform in self.bones.deform:
+                self.get_bone(deform).inherit_scale = 'NONE'
+            if hasattr(self.bones.mch, 'deform'):
+                for mch in self.bones.mch.deform:
+                    self.get_bone(mch).inherit_scale = 'NONE'
+    
+    ####################################################
+    # UI
 
-        self.make_driver(counter_volume, 'power', expression='1 - var * 0.5', variables=[(self.default_prop_bone, 'volume_variation')])
+    def segmented_fk_ui(self, layout, params):
+        layout.row().prop(params, "segmented_fk", toggle=True)
 
-        # Add master control constraint if necessary
-        if hasattr(self, 'master_control') and not self.master_control == 'NONE':
-            self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master, use_y=False, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+    ####################################################
+    # SETTINGS
+
+    @classmethod
+    def add_parameters(self, params):
+        super().add_parameters(params)
+
+        params.segmented_fk = bpy.props.BoolProperty(
+            name="Segmented FK Controls",
+            description="Isolate FK controller scaling",
+            default=False
+            )
+
+    @classmethod
+    def parameters_ui(self, layout, params):
+        self.segmented_fk_ui(self, layout, params)
+        super().parameters_ui(layout, params)
 
 
 class ConnectingBendyRig(BaseBendyRig):
@@ -654,7 +823,7 @@ class ConnectingBendyRig(BaseBendyRig):
                 align = bone_in.tail - bone_in.head
         
         # Incoming parent
-        elif self.incoming_parent:
+        elif self.incoming == 'PARENT' and self.incoming_parent:
             if self.incoming_connect or self.incoming_align:
                 parent_bone = self.get_bone(self.incoming_parent)
                 d_head = (first_org_b.head - parent_bone.head).length
@@ -676,6 +845,8 @@ class ConnectingBendyRig(BaseBendyRig):
             align_bone_x_axis(self.obj, first_def, x_axis)
             copy_bone_position(self.obj, first_def, first_tweak_mch, length=self.get_bone(first_tweak_mch).length)
             copy_bone_position(self.obj, first_def, first_tweak, length=self.get_bone(first_tweak).length)
+            if not self.org_transform == 'FK':
+                copy_bone_position(self.obj, first_def, self.bones.org[0])
 
         # Align
         if align:
@@ -763,6 +934,46 @@ class ConnectingBendyRig(BaseBendyRig):
         if self.tip_bone:
             self.set_bone_parent(self.bones.mch.tweak[-1], self.tip_bone)
 
+    ####################################################
+    # UI
+
+    def incoming_ui(self, layout, params):
+        layout.row().prop(params, 'incoming')
+
+        if params.incoming == 'BONE':
+            layout.row().prop(params, 'incoming_bone')
+
+        if not params.incoming == 'NONE':
+            r = layout.row(align=True)
+            r.prop(params, 'incoming_connect', toggle=True)
+            r.prop(params, 'incoming_align', toggle=True)
+            if params.incoming == 'BONE' and not params.incoming_bone:
+                r.enabled = False
+        
+        if params.incoming == 'BONE' or params.incoming == 'TWEAK':
+            split = layout.split(align=True)
+            r = split.row(align=True)
+            r.prop(params, 'incoming_scale', toggle=True)
+            if params.incoming == 'BONE' and not params.incoming_bone:
+                r.enabled = False
+            r = split.row(align=True)
+            r.prop(params, 'incoming_scale_uniform', toggle=True)
+            if params.incoming == 'BONE' and not params.incoming_bone or not params.incoming_scale:
+                r.enabled = False
+
+    def tip_ui(self, layout, params):
+        layout.row().prop(params, 'tip_bone')
+
+        split = layout.split(align=True)
+        r = split.row(align=True)
+        r.prop(params, 'tip_scale', toggle=True)
+        if not params.tip_bone:
+            r.enabled = False
+        r = split.row(align=True)
+        r.prop(params, 'tip_scale_uniform', toggle=True)
+        if not params.tip_bone or not params.tip_scale:
+            r.enabled = False
+
     ##############################
     # Settings
 
@@ -832,40 +1043,8 @@ class ConnectingBendyRig(BaseBendyRig):
 
     @classmethod
     def parameters_ui(self, layout, params):
-        layout.row().prop(params, 'incoming')
-
-        if params.incoming == 'BONE':
-            layout.row().prop(params, 'incoming_bone')
-
-        if not params.incoming == 'NONE':
-            r = layout.row(align=True)
-            r.prop(params, 'incoming_connect', toggle=True)
-            r.prop(params, 'incoming_align', toggle=True)
-            if params.incoming == 'BONE' and not params.incoming_bone:
-                r.enabled = False
-        
-        if params.incoming == 'BONE' or params.incoming == 'TWEAK':
-            split = layout.split(align=True)
-            r = split.row(align=True)
-            r.prop(params, 'incoming_scale', toggle=True)
-            if params.incoming == 'BONE' and not params.incoming_bone:
-                r.enabled = False
-            r = split.row(align=True)
-            r.prop(params, 'incoming_scale_uniform', toggle=True)
-            if params.incoming == 'BONE' and not params.incoming_bone or not params.incoming_scale:
-                r.enabled = False
-
-        layout.row().prop(params, 'tip_bone')
-
-        split = layout.split(align=True)
-        r = split.row(align=True)
-        r.prop(params, 'tip_scale', toggle=True)
-        if not params.tip_bone:
-            r.enabled = False
-        r = split.row(align=True)
-        r.prop(params, 'tip_scale_uniform', toggle=True)
-        if not params.tip_bone or not params.tip_scale:
-            r.enabled = False
+        self.incoming_ui(self, layout, params)
+        self.tip_ui(self, layout, params)
         super().parameters_ui(layout, params)
 
 
@@ -878,45 +1057,40 @@ class MasterControlBendyRig(BaseBendyRig):
         super().initialize()
 
         self.master_control = self.params.master_control
+        self.master_rotation_mode = self.params.master_rotation_mode
 
     ####################################################
     # Master control
 
     @stage.generate_bones
     def make_master_control(self):
-        if not self.master_control == 'NONE':
+        if self.master_control:
             org = self.bones.org[0]
             self.bones.ctrl.master = self.copy_bone(org, make_derived_name(org, 'ctrl', '_master'))
     
     @stage.parent_bones
     def parent_master_control(self):
-        if not self.master_control == 'NONE':
+        if self.master_control:
             self.set_bone_parent(self.bones.ctrl.master, self.root_bone)
 
     @stage.configure_bones
     def configure_master_control(self):
-        if not self.master_control == 'NONE':
+        if self.master_control:
             master = self.bones.ctrl.master
             bone = self.get_bone(master)
             bone.lock_location = (True, True, True)
-            bone.lock_scale = (False, True, False)
-
-            if self.master_control == 'SCALE':
-                bone.lock_rotation = (True, True, True)
-                bone.lock_rotation_w = True
+            bone.lock_scale = (True, True, True)
+            bone.rotation_mode = self.master_rotation_mode
 
     @stage.generate_widgets
     def make_master_control_widget(self):
-        if not self.master_control == 'NONE':
+        if self.master_control:
             ctrls = self.bones.ctrl
             bone = ctrls.master
-            if self.master_control == 'ROTATION':
-                create_ballsocket_widget(self.obj, bone, size=0.7)
-                transform = ctrls.fk[-1] if self.tip_bone else ctrls.tweak[-1]
-            else:
-                create_gear_widget(self.obj, bone, size=4)
-                transform = ctrls.fk[0]
+            create_ballsocket_widget(self.obj, bone, size=0.7)
+            transform = ctrls.fk[-1] if self.tip_bone else ctrls.tweak[-1]
             set_bone_widget_transform(self.obj, bone, transform)
+
     
     ####################################################
     # Control chain
@@ -924,17 +1098,20 @@ class MasterControlBendyRig(BaseBendyRig):
     @stage.rig_bones
     def rig_control_chain(self):
         '''Add master control constraints if no MCH found'''
-        if not self.master_control == 'NONE' and not hasattr(self.bones.mch, 'fk'):
+        if self.master_control and not hasattr(self.bones.mch, 'fk'):
             for ctrl in self.bones.ctrl.fk:
                 self.make_constraint(ctrl, 'COPY_ROTATION', self.bones.ctrl.master, mix_mode='BEFORE', target_space='LOCAL', owner_space='LOCAL')
 
     ####################################################
-    # Deform chain
+    # UI
 
-    def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
-        super().rig_deform_bone(i, deform, tweak, next_tweak, fk)
-        if not self.master_control == 'NONE':
-            self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master, use_y=False, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+    def master_control_ui(self, layout, params):
+        split = layout.row(align=True).split(align=True)
+        split.row(align=True).prop(params, "master_control", toggle=True)
+        r = split.row(align=True)
+        r.prop(params, "master_rotation_mode", text="")
+        if not params.master_control:
+            r.enabled=False
 
     ####################################################
     # SETTINGS
@@ -943,26 +1120,40 @@ class MasterControlBendyRig(BaseBendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.master_control = bpy.props.EnumProperty(
-            items=[
-                ('NONE', "None", "None"),
-                ('SCALE', "Scale", "Scale"),
-                ('ROTATION', "Rotation & Scale", "Rotation & Scale"),
-            ],
+        rotation_modes = (
+            ('QUATERNION', 'Quaternion (WXYZ)', 'Quaternion (WXYZ)'),
+            ('XYZ', 'XYZ', 'XYZ'),
+            ('XZY', 'XZY', 'XZY'), 
+            ('YXZ', 'YXZ', 'YXZ'),
+            ('YZX', 'YZX', 'YZX'),
+            ('ZXY', 'ZXY', 'ZXY'),
+            ('ZYX', 'ZYX', 'ZYX'),
+            ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
+        )
+
+        params.master_rotation_mode = bpy.props.EnumProperty(
+            name="Default Master Control Rotation Mode",
+            items=rotation_modes,
+            default='XYZ',
+            description="Default rotation mode for master control"
+        )
+
+        params.master_control = bpy.props.BoolProperty(
             name="Master Control",
             description="Add master controller for the whole chain",
-            default='NONE'
+            default=False
             )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        layout.row().prop(params, "master_control")
-
+        self.master_control_ui(self, layout, params)
         super().parameters_ui(layout, params)
 
 
 class ParentSwitchBendyRig(BaseBendyRig):
     """
+    WIP
+
     Connecting Bendy switchable parenting.
     """
 
@@ -980,7 +1171,7 @@ class ParentSwitchBendyRig(BaseBendyRig):
 
     @stage.parent_bones
     def parent_parent_mch(self):
-        self.set_bone_parent(self.bones.mch.parent, self.rig_parent_bone, inherit_scale='FIX_SHEAR')
+        self.set_bone_parent(self.bones.mch.parent, self.rig_parent_bone)
 
 
 class RotMechBendyRig(BaseBendyRig):

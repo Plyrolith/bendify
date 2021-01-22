@@ -112,7 +112,7 @@ class Rig(SpineRig, BaseBendyRig):
             self.rig_deform_bone(*args)
 
     def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
-        BaseBendyRig.rig_deform_bone(self, i, deform, tweak, next_tweak, fk)
+        BaseBendyRig.rig_deform_bone(self, i, deform, tweak, next_tweak)
 
     @stage.configure_bones
     def configure_bbone_chain(self):
@@ -137,6 +137,17 @@ class Rig(SpineRig, BaseBendyRig):
     
     def rig_org_bone(self, i, org, target):
         self.make_constraint(org, 'COPY_SCALE', target)
+
+    ####################################################
+    # UI
+
+    def pivot_ui(self, layout, params):
+        layout.row().prop(params, 'make_custom_pivot')
+        layout.row().prop(params, 'pivot_pos')
+    
+    def chest_hips_ui(self, layout, params):
+        layout.row().prop(params, 'rotation_mode_end', text="Chest & Hips")
+    
 
     ####################################################
     # SETTINGS
@@ -167,11 +178,9 @@ class Rig(SpineRig, BaseBendyRig):
     
     @classmethod
     def parameters_ui(self, layout, params):
-        layout.row().prop(params, 'make_custom_pivot')
-        layout.row().prop(params, 'pivot_pos')
-        layout.row().prop(params, 'rotation_mode_end', text="Chest & Hips")
-
-        BaseBendyRig.parameters_ui(layout, params)
+        self.pivot_ui(self, layout, params)
+        self.chest_hips_ui(self, layout, params)
+        self.bbones_ui(self, layout, params)
         ControlLayersOption.FK.parameters_ui(layout, params)
 
 

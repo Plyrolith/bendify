@@ -121,14 +121,7 @@ class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
         def arma_move(context, pbone, constraint):
             i = pbone.constraints.find(constraint.name)
             if i > 0:
-                data = context.active_object.data
-                pb_act = data.bones.active
-                context_c = context.copy()
-                context_c["constraint"] = constraint
-                data.bones.active = data.bones[pbone.name]
-                for i in range(i):
-                    bpy.ops.constraint.move_up(context_c, constraint.name, 'BONE')
-                data.bones.active = pb_act
+                pbone.constraints.move(i, 0)
             return i
 
         def arma_targets(obj, arma, targets):
@@ -417,6 +410,80 @@ class BENDIFY_OT_MaterialSlotsSwitch(bpy.types.Operator):
         col.row().prop(self, 'mode', expand=True)
         col.row().prop(self, 'selected')
         col.row().prop(self, 'unlink')
+
+class BENDIFY_OT_MirrorAllWeights(bpy.types.Operator):
+    """Mirror all weights from one side to another"""
+    bl_idname = 'object.mirror_all_weights'
+    bl_label = "Mirror All Weights"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    direction: bpy.props.EnumProperty(
+            items=[
+                ('L_TO_R', "Left to Right", "Left to Right"),
+                ('R_TO_L', "Right to Left", "Right to Left"),
+            ],
+            name="Direction",
+            default='L_TO_R'
+        )
+    selected: bpy.props.BoolProperty(name="Selected Only", default=True)
+    locked: bpy.props.BoolProperty(name="Include Locked", default=False)
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object \
+        and hasattr(context.active_object, 'vertex_groups') \
+        and context.active_object.vertex_groups
+    
+    def execute(self, context):
+        def clean(vg, v_groups, suffix):
+            mirror = vg.name
+            for k, v in suffix.items():
+                mirror = mirror.replace(k, v)
+            i = v_groups.find(mirror)
+            if i > -1:
+                v_groups.active_index = i
+                bpy.ops.object.vertex_group_remove(all=False, all_unlocked=False)
+            v_groups.active_index = vg.index
+            bpy.ops.object.vertex_group_copy()
+            bpy.ops.object.vertex_group_mirror(use_topology=False)
+            v_groups[v_groups.active_index].name = mirror
+        
+        act = context.active_object
+        suffix_dicts = {
+            'L_TO_R':
+            {
+                ".L": ".R",
+                "_L": "_R"
+            },
+            'R_TO_L':
+            {
+                ".R": ".L",
+                "_R": "_L",
+            }
+        }
+        suffix = suffix_dicts[self.direction]
+
+        v_groups = act.vertex_groups
+        
+        if self.selected:
+            clean(v_groups[v_groups.active_index], v_groups, suffix)
+        else:
+            for vg in v_groups:
+                if any(k in vg.name for k in suffix.keys()):
+                    if not vg.lock_weight or self.locked:
+                        clean(vg, v_groups, suffix)
+
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+        col.row().prop(self, 'direction', expand=True)
+        col.row().prop(self, 'selected')
+        col.row().prop(self, 'locked')
 
 class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
     """Switch brush blend method in drawing mode"""

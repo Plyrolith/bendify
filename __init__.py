@@ -28,6 +28,7 @@ classes = (
     BENDIFY_OT_ConstraintsAddArmature,
     BENDIFY_OT_ObjectNamesNormalize,
     BENDIFY_OT_MaterialSlotsSwitch,
+    BENDIFY_OT_MirrorAllWeights,
     BENDIFY_OT_WidgetsSelect,
     BENDIFY_OT_WidgetsTransform,
     BENDIFY_OT_WidgetsEdit,
@@ -40,6 +41,7 @@ classes = (
     BENDIFY_PT_RigifyButtons,
     BENDIFY_PT_BendifyToolsPose,
     BENDIFY_PT_BendifyToolsObject,
+    BENDIFY_PT_BendifyToolsWeightPaint,
     BENDIFY_PT_BendifyWidgets,
     BendifySceneSettings,
 )

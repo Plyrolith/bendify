@@ -53,8 +53,8 @@ class ArmatureLayerManagerPanel(AlmMixIn):
         
         col = split.column()
         if meta_any:
-            col.row().label(text="Pinned Metarig" if bendify.alm_meta or not meta.data else "Layer Names: " + meta.name)
-        if meta_any and not meta_single:
+            col.row().label(text="Pinned Metarig" if bendify.alm_meta or not meta or not meta.data else "Layer Names: " + meta.name)
+        if bendify.alm_meta or meta_any and not meta_single:
             col.row().prop(
                 bendify,
                 'alm_meta',
@@ -308,7 +308,7 @@ class ArmatureLayerManagerPanel(AlmMixIn):
 
     def preview(self, context):
         '''Build a live UI preview based on metarig data'''
-        '''
+        """
         def bone_check(obj, layer):
             return any(b.layers[layer] for b in obj.data.bones) \
             or  any(
@@ -319,7 +319,7 @@ class ArmatureLayerManagerPanel(AlmMixIn):
                 or pb.rigify_parameters.fk_layers_extra and pb.rigify_parameters.fk_layers[layer] \
                 for pb in obj.pose.bones
             )
-        '''
+        """
 
         layout = self.layout
         obj = self.arma(context)
@@ -331,7 +331,7 @@ class ArmatureLayerManagerPanel(AlmMixIn):
                 buttons = []
                 for r in range(28):
                     r_layer = meta.data.rigify_layers[r]
-                    if r_layer.row == i and r_layer.name: #bone_check(obj, r):
+                    if r_layer.row == i and r_layer.name.replace(" ",""): #bone_check(obj, r):
                         buttons.append([r, r_layer.name])
                 if buttons:
                     split = col.row().split()

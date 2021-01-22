@@ -17,7 +17,9 @@ class BENDIFY_PT_BoneType(bpy.types.Panel):
         and context.active_pose_bone
     
     def draw(self, context):
-        BONE_PT_rigify_buttons.draw(self, context)
+        if context.active_pose_bone:
+             # Sometimes gets called even if poll is false... therefore, one more condition
+            BONE_PT_rigify_buttons.draw(self, context)
 
 class BENDIFY_PT_BoneGroups(bpy.types.Panel):
     bl_category = "Bendify"

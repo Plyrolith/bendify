@@ -20,9 +20,23 @@
 
 import bpy
 
-from .bendy_chain_rigs import BaseBendyRig
+from rigify.utils.layers import ControlLayersOption
 
-class Rig(BaseBendyRig):
+from .stretchy_chain_rigs import BendyStretchyRig, ComplexStretchStretchyRig
+
+class Rig(BendyStretchyRig, ComplexStretchStretchyRig):
     """
-    Most basic bendy chain
+    Most basic stretchy chain
     """
+
+    ####################################################
+    # SETTINGS
+
+    @classmethod
+    def parameters_ui(self, layout, params):
+        self.bend_ui(self, layout, params)
+        self.complex_stretch_ui(self, layout, params)
+        self.rotation_mode_tweak_ui(self, layout, params)
+        self.org_transform_ui(self, layout, params)
+        self.bbones_ui(self, layout, params)
+        ControlLayersOption.TWEAK.parameters_ui(layout, params)

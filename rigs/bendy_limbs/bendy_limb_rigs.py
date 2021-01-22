@@ -110,8 +110,8 @@ class BaseLimbBendyRig(BaseLimbRig):
     @stage.rig_bones
     def rig_master_control(self):
         panel = self.script.panel_with_selected_check(self, self.bones.ctrl.flatten())
-        self.make_property(self.prop_bone, 'volume_variation', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
-        panel.custom_prop(self.prop_bone, 'volume_variation', text='Volume Variation', slider=True)
+        self.make_property(self.prop_bone, 'volume_deform', default=1.0, max=100.0, soft_max=1.0, description='Volume variation for DEF bones')
+        panel.custom_prop(self.prop_bone, 'volume_deform', text='Deform Volume Variation', slider=True)
         self.make_property(self.prop_bone, 'align_joint_tweaks', default=float(self.tweak_align_default))
         panel.custom_prop(self.prop_bone, 'align_joint_tweaks', text='Align Joint Tweaks', slider=True)
 
@@ -245,8 +245,13 @@ class BaseLimbBendyRig(BaseLimbRig):
             self.make_constraint(deform, 'COPY_SCALE', self.bones.ctrl.master)
             if next_tweak:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_tweak)
+
+                # Stretch
                 stretch = self.make_constraint(deform, 'STRETCH_TO', next_tweak)
-                self.drivers_deform_bone(i, deform, stretch, entry, next_entry, tweak, next_tweak)
+                self.make_driver(stretch, 'bulge', variables=[(self.prop_bone, 'volume_deform')])
+
+                # Bendy
+                self.bendy_drivers(i, deform, entry, next_entry, tweak, next_tweak)
             elif next_entry:
                 self.make_constraint(deform, 'DAMPED_TRACK', next_entry.org)
                 self.make_constraint(deform, 'STRETCH_TO', next_entry.org)
@@ -254,17 +259,12 @@ class BaseLimbBendyRig(BaseLimbRig):
         else:
             self.make_constraint(deform, 'COPY_TRANSFORMS', entry.org)
 
-    def drivers_deform_bone(self, i, deform, stretch, entry, next_entry, tweak, next_tweak):
+    def bendy_drivers(self, i, deform, entry, next_entry, tweak, next_tweak):
         '''New function to create bendy bone drivers'''
         pbone = self.get_bone(deform)
         space = 'LOCAL_SPACE'
         v_type = 'TRANSFORMS'
         next_org = ([ s for s in self.segment_table_full if s.org_idx == entry.org_idx + 1 ][0].org)
-
-        ####################################################
-        # Volume Variation
-
-        self.make_driver(pbone.constraints["Stretch To"], 'bulge', variables=[(self.prop_bone, 'volume_variation')])
 
         if entry.seg_idx is not None:
             ####################################################
