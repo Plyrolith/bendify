@@ -32,7 +32,7 @@ from rigify.rigs.widgets import create_ballsocket_widget, create_gear_widget
 
 from rigify.rigs.chain_rigs import TweakChainRig
 
-from ...utils.bones import align_bone, distance
+from ...utils.bones import align_bone, distance, real_bone
 from ...utils.misc import threewise_nozip
 from ...utils.widgets_bendy import create_sub_tweak_widget
 
@@ -197,8 +197,8 @@ class BaseBendyRig(TweakChainRig):
 
     @stage.parent_bones
     def parent_org_chain(self):
-        self.parent_bone_chain(self.bones.org, use_connect=False)
-        self.set_bone_parent(self.bones.org[0], self.root_bone)
+        for org in self.bones.org:
+            self.set_bone_parent(org, self.root_bone)
 
     @stage.rig_bones
     def rig_org_chain(self):
@@ -230,18 +230,11 @@ class BaseBendyRig(TweakChainRig):
         super().make_deform_chain()
         self.bbone_chain_length = len(self.bones.deform) - 1
 
-    """
     @stage.parent_bones
     def parent_deform_chain(self):
         '''Parent DEFs to FKs'''
-        for deform, fk in zip(self.bones.deform, self.bones.ctrl.fk):
-            self.set_bone_parent(deform, fk)
-    """
-
-    @stage.parent_bones
-    def parent_deform_chain(self):
-        super().parent_deform_chain()
-        self.set_bone_parent(self.bones.deform[0], self.root_bone)
+        for deform in self.bones.deform:
+            self.set_bone_parent(deform, self.root_bone)
 
     @stage.parent_bones
     def ease_deform_chain(self):
@@ -434,16 +427,17 @@ class BaseBendyRig(TweakChainRig):
         layout.row().prop(params, 'org_transform', text="ORGs")
 
     def bbones_ui(self, layout, params):
-        layout.row().prop(params, 'bbones_spine')
-        r = layout.row(align=True)
+        box = layout.box()
+        box.row().prop(params, 'bbones_spine')
+        r = box.row(align=True)
         r.prop(params, 'bbones_easein', text="Ease In", toggle=True)
         r.prop(params, 'bbones_easeout', text="Ease Out", toggle=True)
 
     ####################################################
     # SETTINGS
     
-    @stage.configure_bones
-    def configure_armature_display(self):
+    @stage.finalize
+    def finalize_armature_display(self):
         '''New function to set rig viewport display'''
         self.obj.data.display_type = 'BBONE'
     
@@ -694,6 +688,7 @@ class SegmentedBendyRig(BaseBendyRig):
 
     def scale_deform_bone(self, deform, target):
         if self.segmented_fk:
+            self.make_constraint(deform, 'COPY_SCALE', self.root_bone)
             counter_volume = self.make_constraint(
                 deform, 'COPY_SCALE', target, use_offset=True,
                 use_y=False, target_space='LOCAL', owner_space='LOCAL'
@@ -705,6 +700,7 @@ class SegmentedBendyRig(BaseBendyRig):
         else:
             super().scale_deform_bone(deform, target)
     
+    """
     @stage.apply_bones
     def fix_deform_shear(self):
         if self.segmented_fk:
@@ -713,6 +709,7 @@ class SegmentedBendyRig(BaseBendyRig):
             if hasattr(self.bones.mch, 'deform'):
                 for mch in self.bones.mch.deform:
                     self.get_bone(mch).inherit_scale = 'NONE'
+    """
     
     ####################################################
     # UI
@@ -855,7 +852,7 @@ class ConnectingBendyRig(BaseBendyRig):
             copy_bone_position(self.obj, first_tweak_mch, first_tweak)
 
         # Tip
-        if self.params.tip_bone and self.params.tip_bone in self.obj.data.edit_bones:
+        if real_bone(self.obj, self.params.tip_bone):
             self.tip_bone = self.params.tip_bone
 
     ####################################################
@@ -938,6 +935,8 @@ class ConnectingBendyRig(BaseBendyRig):
     # UI
 
     def incoming_ui(self, layout, params):
+        if not params.incoming == 'NONE':
+            layout = layout.box()
         layout.row().prop(params, 'incoming')
 
         if params.incoming == 'BONE':
@@ -962,17 +961,21 @@ class ConnectingBendyRig(BaseBendyRig):
                 r.enabled = False
 
     def tip_ui(self, layout, params):
+        if params.tip_bone:
+            layout = layout.box()
+        
         layout.row().prop(params, 'tip_bone')
 
-        split = layout.split(align=True)
-        r = split.row(align=True)
-        r.prop(params, 'tip_scale', toggle=True)
-        if not params.tip_bone:
-            r.enabled = False
-        r = split.row(align=True)
-        r.prop(params, 'tip_scale_uniform', toggle=True)
-        if not params.tip_bone or not params.tip_scale:
-            r.enabled = False
+        if params.tip_bone:
+            split = layout.split(align=True)
+            r = split.row(align=True)
+            r.prop(params, 'tip_scale', toggle=True)
+            if not params.tip_bone:
+                r.enabled = False
+            r = split.row(align=True)
+            r.prop(params, 'tip_scale_uniform', toggle=True)
+            if not params.tip_bone or not params.tip_scale:
+                r.enabled = False
 
     ##############################
     # Settings
@@ -983,7 +986,7 @@ class ConnectingBendyRig(BaseBendyRig):
 
         params.incoming = bpy.props.EnumProperty(
             items=[
-                ('NONE', "Free", "Free"),
+                ('NONE', "Default", "Default"),
                 ('PARENT', "To Parent", "Connect first tweak to parent"),
                 ('TWEAK', "Merge Tweaks", "Merge with closest parent tweak"),
                 ('BONE', "Define Bone", "Specify parent for first tweak by name"),

@@ -510,8 +510,8 @@ class BaseLimbBendyRig(BaseLimbRig):
     ####################################################
     # Settings
 
-    @stage.configure_bones
-    def configure_armature_display(self):
+    @stage.finalize
+    def finalize_armature_display(self):
         '''New function to set rig viewport display'''
         self.obj.data.display_type = 'BBONE'
 

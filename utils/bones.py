@@ -22,10 +22,18 @@ import bpy
 
 from rigify.utils.bones import align_bone_roll, align_bone_y_axis, get_bone
 
+
+#=============================================
+# Utilities
+#=============================================
+
+def real_bone(obj, bone_name):
+    bones = obj.data.edit_bones if obj.mode == 'EDIT' else obj.pose.bones
+    return bone_name and bone_name in bones
+
 #=============================================
 # Math
 #=============================================
-
 
 def distance(obj, bone_name1, bone_name2, tail=False):
     '''Return the distance between two bone heads (or tails)'''
@@ -35,7 +43,6 @@ def distance(obj, bone_name1, bone_name2, tail=False):
     pos2 = bone2.tail if tail else bone2.head
 
     return (pos1 - pos2).length
-
 
 #=============================================
 # Aligning

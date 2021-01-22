@@ -142,8 +142,9 @@ class Rig(SpineRig, BaseBendyRig):
     # UI
 
     def pivot_ui(self, layout, params):
-        layout.row().prop(params, 'make_custom_pivot')
-        layout.row().prop(params, 'pivot_pos')
+        box = layout.box()
+        box.row().prop(params, 'make_custom_pivot', toggle=True)
+        box.row().prop(params, 'pivot_pos', text="Pivot Position")
     
     def chest_hips_ui(self, layout, params):
         layout.row().prop(params, 'rotation_mode_end', text="Chest & Hips")
