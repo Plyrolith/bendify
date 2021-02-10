@@ -56,6 +56,7 @@ class Rig(RotMechBendyRig, SegmentedBendyRig, MasterControlBendyRig, ConnectingB
     @classmethod
     def parameters_ui(self, layout, params):
         self.master_control_ui(self, layout, params)
+        self.segmented_fk_ui(self, layout, params)
         self.incoming_ui(self, layout, params)
         self.rotation_mode_tweak_ui(self, layout, params)
         self.org_transform_ui(self, layout, params)

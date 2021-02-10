@@ -3,7 +3,7 @@ import re
 import unicodedata
 
 class BENDIFY_OT_StretchToReset(bpy.types.Operator):
-    """Reset Stretch To constraint length for selected bones"""
+    """Reset Stretch To constraint length for bones"""
     bl_idname = 'pose.stretchto_reset'
     bl_label = "Reset Strech Constraints"
     bl_options = {'REGISTER', 'UNDO'}
@@ -16,7 +16,24 @@ class BENDIFY_OT_StretchToReset(bpy.types.Operator):
 
     def execute(self, context):
         #bpy.ops.constraint.stretchto_reset()
-        bones = context.selected_pose_bones if self.selected else context.active_object.pose.bones
+
+        # Selection only
+        if self.selected:
+            bones = context.selected_pose_bones
+        
+        # Build pose bone list
+        else:
+            bones = []
+            objs = [obj for obj in context.selected_objects if obj.type == 'ARMATURE']
+
+            act = context.active_object
+            if act.type == 'ARMATURE' and not act in objs:
+                objs.append(act)
+            
+            for obj in objs:
+                bones.extend(obj.pose.bones)
+        
+        # Reset
         for bone in bones:
             for c in bone.constraints:
                 if c.type == 'STRETCH_TO':
@@ -37,6 +54,7 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
 
     def execute(self, context):
         def mirror_name(name):
+            """Mirror string dot suffix"""
             pair = []
             if ".L" in name:
                 pair = [".L", ".R"]
@@ -45,17 +63,20 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
             if pair:
                 return name.replace(pair[0], pair[1])
         
-        def mirror_bone(obj, bone):
-            mn = mirror_name(bone.name)
+        def mirror_bone(pbone):
+            """Find mirrored pose bone"""
+            obj = pbone.id_data
+            mn = mirror_name(pbone.name)
             if mn and mn in obj.pose.bones:
                 return obj.pose.bones[mn]
 
-        obj = context.active_object
         pbones = context.selected_pose_bones
         pb_active = context.active_pose_bone
 
+        # Mirror
         for pb in pbones:
-            mb = mirror_bone(obj, pb)
+            obj = pb.id_data
+            mb = mirror_bone(pb)
             if mb:
                 bpy.ops.pose.select_all(action='DESELECT')
                 obj.data.bones[pb.name].select = True
@@ -67,6 +88,8 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
 
                 if givr.constraints:
                     bpy.ops.pose.constraints_copy()
+
+                    # Fix sides for targets/subtargets
                     for c in rcvr.constraints:
                         c.name = mirror_name(c.name) or c.name
                         if hasattr(c, 'subtarget'):
@@ -77,10 +100,12 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
                                 if t.subtarget:
                                     t.subtarget = mirror_name(t.subtarget) or t.subtarget
         
+        # Restore selection and active bone
         bpy.ops.pose.select_all(action='DESELECT')
         for bone_sel in pbones:
-            obj.data.bones[bone_sel.name].select = True
-        obj.data.bones.active = obj.data.bones[pb_active.name]
+            bone_sel.id_data.data.bones[bone_sel.name].select = True
+        if pb_active:
+            pb_active.id_data.data.bones.active = obj.data.bones[pb_active.name]
         return {"FINISHED"}
 
 class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
@@ -102,13 +127,17 @@ class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
         default='ACTIVE'
     )
     redistribute: bpy.props.BoolProperty(name="Redistribute Weights", default=False)
+    parent_clear: bpy.props.BoolProperty(name="Clear Parent", default=True)
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'POSE' and len([obj for obj in context.selected_objects if obj.type == 'ARMATURE']) == 1
+        return context.mode == 'POSE' \
+        and context.active_pose_bone \
+        and context.selected_pose_bones
 
     def execute(self, context):
         def arma_get(pbone):
+            """Find existing armature constraint or create new one and return"""
             arma = None
             for c in pbone.constraints:
                 if c.type == 'ARMATURE':
@@ -118,61 +147,79 @@ class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
                 arma = pbone.constraints.new(type='ARMATURE')
             return arma
         
-        def arma_move(context, pbone, constraint):
+        def arma_move(pbone, constraint):
+            """Move constraint to the first place"""
             i = pbone.constraints.find(constraint.name)
             if i > 0:
                 pbone.constraints.move(i, 0)
             return i
 
-        def arma_targets(obj, arma, targets):
+        def arma_targets(arma, targets):
+            """Add new targets to armature constraint from list of pose bones
+            """
             weight = 1.0
             for t in arma.targets:
                 weight -= t.weight
-                if t.target == obj and t.subtarget in targets:
-                    targets.remove(t.subtarget)
+
+                # Remove existing targets from list
+                pb_subtarget = t.target.pose.bones[t.subtarget]
+                if pb_subtarget in targets:
+                    targets.remove(pb_subtarget)
             
-            weight = weight / len(targets)
+            if targets:
+                weight = weight / len(targets)
 
             for t in targets:
                 new_t = arma.targets.new()
-                new_t.target = obj
-                new_t.subtarget = t
+                new_t.target = t.id_data
+                new_t.subtarget = t.name
                 new_t.weight = weight
             
         def arma_redistribute(arma):
+            """Even weight of all armature constraint targets"""
             l = len(arma.targets)
             for t in arma.targets:
                 t.weight = 1.0 / l
         
-        act = context.active_object
+        # Create paring dict based on mode
         pairing = {}
+        
         if self.mode == 'ACTIVE':
-            targets = [b.name for b in context.selected_pose_bones]
-            targets.remove(context.active_pose_bone.name)
-            pairing[context.active_pose_bone] = targets
+            pb_act = context.active_pose_bone
+            targets = [b for b in context.selected_pose_bones]
+            targets.remove(pb_act)
+            if targets:
+                pairing[pb_act] = targets
 
         elif self.mode == 'SELECTED':
+            pb_act = context.active_pose_bone
             receivers = context.selected_pose_bones
-            receivers.remove(context.active_pose_bone)
+            receivers.remove(pb_act)
             for r in receivers:
-                pairing[r] = [context.active_pose_bone.name]
+                pairing[r] = [pb_act]
         
         elif self.mode == 'PARENT':
             for b in context.selected_pose_bones:
                 if b.parent:
-                    pairing[b] = [b.parent.name]
+                    pairing[b] = [b.parent]
         
-        bpy.ops.object.mode_set(mode='EDIT')
-        for b in pairing:
-            if b.parent:
-                act.data.edit_bones[b.name].parent = None
-        act.update_from_editmode()
-        bpy.ops.object.mode_set(mode='POSE')
+        # Clear parenting
+        if self.parent_clear:
+            try:
+                bpy.ops.object.mode_set(mode='EDIT')
+                for b in pairing:
+                    if b.parent:
+                        b.id_data.data.edit_bones[b.name].parent = None
+                        b.id_data.update_from_editmode()
+                bpy.ops.object.mode_set(mode='POSE')
+            except:
+                print("Unparenting failed. Linked Armature Data?")
 
+        # Set up armature constraints
         for b in pairing:
             arma = arma_get(b)
-            arma_move(context, b, arma)
-            arma_targets(act, arma, pairing[b])
+            arma_move(b, arma)
+            arma_targets(arma, pairing[b])
 
             arma.use_bone_envelopes = self.use_bone_envelopes
             arma.use_deform_preserve_volume = self.use_deform_preserve_volume

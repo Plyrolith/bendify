@@ -51,12 +51,19 @@ class AlmMixIn():
     def bendify(self, context):
         return context.scene.bendify
     
-    @classmethod
-    def poll(self, context):
+    def poll_general(self, context):
         pin = context.scene.bendify.alm_pin
         act = context.active_object
         if pin:
             return pin
+        elif act and act.type == 'ARMATURE':
+            return act
+    
+    def poll_active(self, context):
+        pin = context.scene.bendify.alm_pin
+        act = context.active_object
+        if pin and act:
+            return pin == act
         elif act and act.type == 'ARMATURE':
             return act
 
@@ -65,6 +72,10 @@ class BENDIFY_OT_AlmToggle(bpy.types.Operator, AlmMixIn):
     bl_idname = 'view3d.armature_layer_manager_toggle'
     bl_label = "Armature Layers Toggle"
     bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(self, context):
+        return AlmMixIn.poll_general(self, context)
 
     def execute(self, context):
         if sum(self.bendify(context).alm_layers) == 0:
@@ -84,6 +95,10 @@ class BENDIFY_OT_AlmSelect(bpy.types.Operator, AlmMixIn):
     layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
     select: bpy.props.BoolProperty(name="Select", default=True)
     new: bpy.props.BoolProperty(name="New Selection", default=True)
+
+    @classmethod
+    def poll(self, context):
+        return AlmMixIn.poll_active(self, context)
 
     def execute(self, context):
         def bone_select(bone, select):
@@ -113,6 +128,10 @@ class BENDIFY_OT_AlmLock(bpy.types.Operator, AlmMixIn):
     bl_options = {'REGISTER', 'UNDO'}
     
     layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
+
+    @classmethod
+    def poll(self, context):
+        return AlmMixIn.poll_active(self, context)
 
     def execute(self, context):
         obj = self.arma(context)
@@ -147,12 +166,12 @@ class BENDIFY_OT_AlmAdd(bpy.types.Operator, AlmMixIn):
     
     @classmethod
     def poll(self, context):
-        if AlmMixIn.poll(context):
-            return context.selected_bones or context.selected_pose_bones
+        if AlmMixIn.poll_general(self, context):
+            return context.selected_bones or context.selected_pose_bones_from_active_object
 
     def execute(self, context):
         if context.mode == 'POSE':
-            bones = [context.active_object.data.bones[b.name] for b in context.selected_pose_bones]
+            bones = [context.active_object.data.bones[b.name] for b in context.selected_pose_bones_from_active_object]
         else:
             bones = context.selected_bones
         for bone in bones:
@@ -170,6 +189,10 @@ class BENDIFY_OT_AlmSolo(bpy.types.Operator, AlmMixIn):
     bl_options = {'REGISTER', 'UNDO'}
     
     layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
+
+    @classmethod
+    def poll(self, context):
+        return AlmMixIn.poll_general(self, context)
 
     def execute(self, context):
         obj = self.arma(context)

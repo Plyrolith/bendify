@@ -127,7 +127,7 @@ class BaseBendyRig(TweakChainRig):
 
     def parent_tweak_mch_bone(self, i, mch, parent):
         '''Parent tweak MCH'''
-        self.set_bone_parent(mch, parent)
+        self.set_bone_parent(mch, parent, inherit_scale='FIX_SHEAR')
 
     @stage.parent_bones
     def align_tweak_mch_chain(self):
@@ -277,7 +277,7 @@ class BaseBendyRig(TweakChainRig):
         #self.make_constraint(bone, 'COPY_ROTATION', target)
     
     def scale_deform_bone(self, bone, target):
-        self.make_constraint(bone, 'COPY_SCALE', target, use_offset=True, target_space='LOCAL', owner_space='LOCAL')
+        self.make_constraint(bone, 'COPY_SCALE', target)
 
     def track_deform_bone(self, bone, target):
         self.make_constraint(bone, 'DAMPED_TRACK', target)
@@ -505,7 +505,7 @@ class BaseBendyRig(TweakChainRig):
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 
-# Combine between the following
+# Combine from the following
 
 class ComplexStretchBendyRig(BaseBendyRig):
     """
@@ -608,6 +608,7 @@ class SegmentedBendyRig(BaseBendyRig):
         super().initialize()
 
         self.segmented_fk = self.params.segmented_fk
+        self.segmented_align = self.params.segmented_align
 
     ##############################
     # Utilities
@@ -653,7 +654,7 @@ class SegmentedBendyRig(BaseBendyRig):
     def parent_fk_mch_chain(self):
         if self.segmented_fk:
             for mch, parent in zip(self.bones.mch.fk, [self.root_bone] + self.bones.ctrl.fk):
-                self.set_bone_parent(mch, parent)
+                self.set_bone_parent(mch, parent, inherit_scale='ALIGNED' if self.segmented_align else 'FULL')
 
     @stage.rig_bones
     def rig_fk_mch_chain(self):
@@ -715,7 +716,12 @@ class SegmentedBendyRig(BaseBendyRig):
     # UI
 
     def segmented_fk_ui(self, layout, params):
-        layout.row().prop(params, "segmented_fk", toggle=True)
+        split = layout.split(align=True)
+        split.row(align=True).prop(params, "segmented_fk", toggle=True)
+        r = split.row(align=True)
+        r.row(align=True).prop(params, "segmented_align", toggle=True)
+        if not params.segmented_fk:
+            r.enabled = False
 
     ####################################################
     # SETTINGS
@@ -725,10 +731,17 @@ class SegmentedBendyRig(BaseBendyRig):
         super().add_parameters(params)
 
         params.segmented_fk = bpy.props.BoolProperty(
-            name="Segmented FK Controls",
+            name="Segmented FK",
             description="Isolate FK controller scaling",
             default=False
             )
+        
+        params.segmented_align = bpy.props.BoolProperty(
+            name="Align Segments",
+            description="Align segment scaling by default for better control; may result in unexprected master scaling behavior",
+            default=True
+            )
+
 
     @classmethod
     def parameters_ui(self, layout, params):
@@ -911,15 +924,15 @@ class ConnectingBendyRig(BaseBendyRig):
         '''Re-parent first and tip tweak MCH'''
         mch = self.bones.mch.tweak[0]
 
-        if self.incoming_tweak:
+        if self.incoming == 'TWEAK' and self.incoming_tweak:
             # Parent first tweak MCH to incoming tweak
             self.set_bone_parent(mch, self.incoming_tweak)
         
-        elif self.incoming_bone:
+        elif self.incoming == 'BONE' and self.incoming_bone:
             # Parent to specified bone
             self.set_bone_parent(mch, self.incoming_bone)
         
-        elif self.incoming_parent:
+        elif self.incoming == 'PARENT' and self.incoming_parent:
             # If not tweak, parent to actual parent
             self.set_bone_parent(mch, self.incoming_parent)
         

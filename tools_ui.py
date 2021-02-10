@@ -15,11 +15,13 @@ class BendifyToolsPosePanel():
         col.row().operator('pose.constraints_mirror', icon='MOD_MIRROR')
 
         col.row().separator()
+        
+        col = layout.box().column()
         col.row().label(text="Armature Constraints", icon='MOD_ARMATURE')
         row = col.row()
         arma_par = row.operator('pose.constraints_add_armature', text="Convert Parents", icon='TRANSFORM_ORIGINS')
         arma_par.mode = 'PARENT'
-        row = layout.row(align=True)
+        row = col.row(align=True)
         arma_sel = row.operator('pose.constraints_add_armature', text="To Selected", icon='FULLSCREEN_ENTER')
         arma_sel.mode = 'SELECTED'
         arma_act = row.operator('pose.constraints_add_armature', text="To Active", icon='FULLSCREEN_EXIT')
@@ -47,8 +49,9 @@ class BENDIFY_PT_BendifyToolsPose(bpy.types.Panel, BendifyToolsPosePanel):
     bl_category = "Bendify"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_label = "Bendify Tools"
+    bl_label = "Constraint Tools"
     bl_order = 2
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(self, context):

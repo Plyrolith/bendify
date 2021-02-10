@@ -24,14 +24,14 @@ from rigify.utils.layers import ControlLayersOption
 
 from .stretchy_chain_rigs import BendyStretchyRig, ComplexStretchStretchyRig, ParentedStretchyRig, ScalingStretchyRig, CurvyStretchyRig, StraightStretchyRig
 
-class Rig(StraightStretchyRig, CurvyStretchyRig, ScalingStretchyRig, ParentedStretchyRig, BendyStretchyRig, ComplexStretchStretchyRig):
+class Rig(BendyStretchyRig, CurvyStretchyRig, ScalingStretchyRig, ParentedStretchyRig, StraightStretchyRig, ComplexStretchStretchyRig):
     """
     Most basic stretchy chain
     """
 
     ####################################################
     # SETTINGS
-
+    
     @classmethod
     def parameters_ui(self, layout, params):
         self.curve_ui(self, layout, params)
@@ -44,3 +44,4 @@ class Rig(StraightStretchyRig, CurvyStretchyRig, ScalingStretchyRig, ParentedStr
         self.org_transform_ui(self, layout, params)
         self.bbones_ui(self, layout, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
+        

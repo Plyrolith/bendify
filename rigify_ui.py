@@ -7,12 +7,11 @@ class BENDIFY_PT_BoneType(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_label = "Rigify Type"
     bl_order = 1
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
-        return context.object \
-        and context.object.type == 'ARMATURE' \
+        return context.active_object \
+        and context.active_object.type == 'ARMATURE' \
         and context.active_object.data.get("rig_id") is None \
         and context.active_pose_bone
     
@@ -31,9 +30,9 @@ class BENDIFY_PT_BoneGroups(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.object \
-        and context.object.type == 'ARMATURE' \
-        and context.object.data.get("rig_id") is None
+        return context.active_object \
+        and context.active_object.type == 'ARMATURE' \
+        and context.active_object.data.get("rig_id") is None
 
     def draw(self, context):
         DATA_PT_rigify_bone_groups.draw(self, context)
@@ -45,12 +44,11 @@ class BENDIFY_PT_RigifyButtons(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_label = "Rigify Buttons"
     bl_order = 5
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
-        return context.object \
-        and context.object.type == 'ARMATURE' \
+        return context.active_object \
+        and context.active_object.type == 'ARMATURE' \
         and context.active_object.data.get("rig_id") is None
     
     def draw(self, context):

@@ -49,6 +49,7 @@ class Rig(SpineRig, BaseBendyRig):
     ####################################################
     # Master control bone
 
+    @stage.generate_bones
     def make_master_control(self):
         # Set master control as default prop bone
         super().make_master_control()

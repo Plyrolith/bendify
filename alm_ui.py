@@ -148,11 +148,14 @@ class ArmatureLayerManagerPanel(AlmMixIn):
 
         self.toggles(context, col)
 
-        for i in self.layers_get(context):  
+        for i in self.layers_get(context):
+            act_b = context.active_bone
+            act_pb = context.active_pose_bone
+            bones = data.bones
             
             # Check for edit bones in this layer               
             if context.mode == 'EDIT_ARMATURE':
-                if context.active_bone and context.active_bone.layers[i]:
+                if act_b and act_b.layers[i]:
                     layer_icon = 'RADIOBUT_ON'
                     empty = False
                 elif any(b.layers[i] for b in context.selected_editable_bones):
@@ -167,13 +170,16 @@ class ArmatureLayerManagerPanel(AlmMixIn):
             
             # Same for regular bones in other modes
             else:
-                if context.active_pose_bone and data.bones[context.active_pose_bone.name].layers[i]:
+                if context.mode == 'POSE' and act_pb and act_pb.name in bones and bones[act_pb.name].layers[i]:
                     layer_icon = 'RADIOBUT_ON'
                     empty = False
-                elif context.mode == 'POSE' and any(data.bones[b.name].layers[i] for b in context.selected_pose_bones):
+                elif act_b and act_b.name in bones and bones[act_b.name].layers[i]:
+                    layer_icon = 'RADIOBUT_ON'
+                    empty = False
+                elif context.mode == 'POSE' and any(bones[b.name].layers[i] for b in context.selected_pose_bones_from_active_object if b.name in bones):
                     layer_icon = 'LAYER_ACTIVE'
                     empty = False
-                elif any(data.bones[b.name].layers[i] for b in obj.pose.bones):
+                elif any(b.layers[i] for b in bones):
                     layer_icon = 'LAYER_USED'
                     empty = False
                 else:
@@ -239,7 +245,7 @@ class ArmatureLayerManagerPanel(AlmMixIn):
                 # Lock button
                 unlocked = 0
                 locked = 0
-                for bone in data.bones:
+                for bone in bones:
                     if bone.layers[i]:
                         if bone.hide_select:
                             locked += 1

@@ -91,26 +91,21 @@ class BaseStretchyRig(BaseBendyRig):
     # Tweak Targets
 
     def check_mch_parents(self):
-        return self.bones.mch.arma
+        return (len(self.bones.org) + 1) * [self.bones.mch.bend]
 
     def check_mch_targets(self):
-        return threewise_nozip(self.check_mch_parents())
+        return threewise_nozip([self.bones.ctrl.start, *self.bones.org[1:], self.bones.ctrl.end])
 
     ####################################################
     # Tweak MCH chain
 
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
-        '''Scale from root'''
-        mch = self.bones.mch
-        #parents = self.check_mch_parents()
-        targets = self.check_mch_targets()
-
-        for i, mch, p, c, n  in zip(count(0), mch.tweak, *targets):
-            self.rig_tweak_mch_bone(i, mch, self.root_bone, p, c, n)
+        for mch in self.bones.mch.tweak:
+            self.make_constraint(mch, 'COPY_SCALE', self.root_bone, use_make_uniform=True)
 
     ####################################################
-    # Stretch MCHs
+    # Stretch MCH
 
     @stage.generate_bones
     def make_stretch_mch(self):
@@ -140,26 +135,30 @@ class BaseStretchyRig(BaseBendyRig):
         self.make_driver(stretch, 'bulge', variables=[(self.default_prop_bone, 'volume_stretch')])
     
     ####################################################
-    # Armature MCHs
+    # Bend MCH
 
     @stage.generate_bones
-    def make_arma_mch_chain(self):
+    def make_bend_mch(self):
         orgs = self.bones.org
-        self.bones.mch.arma = map_list(self.make_arma_mch_bone, count(0), orgs + orgs[-1:])
+        bend = make_derived_name(orgs[0], 'mch', "_bend")
+        self.bones.mch.bend = self.copy_bone(orgs[0], bend, parent=False)
+        self.get_bone(bend).tail = self.get_bone(orgs[-1]).tail
+        align_bone_x_axis(self.obj, bend, self.get_bone(orgs[0]).x_axis)
 
-    def make_arma_mch_bone(self, i, org):
-        name = make_derived_name(org, 'mch', '_arma')
-        name = self.copy_bone(org, name, parent=False)
-
-        if i == len(self.bones.org):
-            put_bone(self.obj, name, self.get_bone(org).tail)
-        
-        return name
-    
     @stage.parent_bones
-    def parent_arma_mch_chain(self):
-        for arma in self.bones.mch.arma:
-            self.set_bone_parent(arma, self.bones.mch.stretch)
+    def parent_bend_mch(self):
+        self.set_bone_parent(self.bones.mch.bend, self.root_bone)
+
+    @stage.rig_bones
+    def rig_bend_mch(self):
+        ctrls = self.bones.ctrl
+        mchs = self.bones.mch
+        start = ctrls.start
+        end = ctrls.end
+        self.make_constraint(mchs.bend, 'COPY_LOCATION', start)
+        self.make_constraint(mchs.bend, 'DAMPED_TRACK', end)
+        self.make_constraint(mchs.bend, 'COPY_SCALE', mchs.stretch)
+        self.bendy_drivers(mchs.bend, start, end)
 
     ##############################
     # ORG chain
@@ -168,8 +167,8 @@ class BaseStretchyRig(BaseBendyRig):
     def rig_org_chain(self):
         '''Set ORG transformation according to rig setting'''
         ctrls = self.bones.ctrl
-        for org, deform, tweak, next_tweak, arma in zip(self.bones.org, self.bones.deform, ctrls.tweak, ctrls.tweak[1:], self.bones.mch.arma):
-            self.rig_org_bone(org, deform, tweak, next_tweak, arma)
+        for org, deform, tweak, next_tweak in zip(self.bones.org, self.bones.deform, ctrls.tweak, ctrls.tweak[1:]):
+            self.rig_org_bone(org, deform, tweak, next_tweak, deform)
 
     ##############################
     # Deform chain
@@ -191,9 +190,220 @@ class BaseStretchyRig(BaseBendyRig):
         self.bbones_ui(self, layout, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
-# Combine between the following
 
-class StraightStretchyRig(BaseStretchyRig):
+class SingleSegmentStretchyRig(BaseStretchyRig):
+    """
+    Stretchy rig with reduced complexity for single segment
+    """
+
+    def initialize(self):
+        super().initialize()
+
+        self.single_segment = True if len(self.bones.org) == 1 else False
+
+    ####################################################
+    # Master control
+
+    @stage.configure_bones
+    def configure_master_properties(self):
+        if self.single_segment:
+            BaseBendyRig.configure_master_properties(self)
+        else:
+            super().configure_master_properties()
+
+    ##############################
+    # Stretch control
+
+    @stage.generate_bones
+    def make_control_chain(self):
+        super().make_control_chain()
+        if self.single_segment:
+            self.bones.ctrl.tweak = [self.bones.ctrl.start, self.bones.ctrl.end]
+
+    ####################################################
+    # Stretch MCHs
+
+    @stage.generate_bones
+    def make_stretch_mch(self):
+        if self.single_segment:
+            pass
+        else:
+            super().make_stretch_mch()
+    
+    @stage.parent_bones
+    def parent_stretch_mch(self):
+        if self.single_segment:
+            pass
+        else:
+            super().parent_stretch_mch()
+
+    @stage.rig_bones
+    def rig_stretch_mch(self):
+        if self.single_segment:
+            pass
+        else:
+            super().rig_stretch_mch()
+
+    ####################################################
+    # Bend MCH
+
+    @stage.generate_bones
+    def make_bend_mch(self):
+        if self.single_segment:
+            pass
+        else:
+            super().make_bend_mch()
+
+    @stage.parent_bones
+    def parent_bend_mch(self):
+        if self.single_segment:
+            pass
+        else:
+            super().parent_bend_mch()
+
+    @stage.rig_bones
+    def rig_bend_mch(self):
+        if self.single_segment:
+            pass
+        else:
+            super().rig_bend_mch()
+
+    ####################################################
+    # Tweak MCH chain
+
+    @stage.generate_bones
+    def make_tweak_mch_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().make_tweak_mch_chain()
+
+    @stage.parent_bones
+    def parent_tweak_mch_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().parent_tweak_mch_chain()
+
+    @stage.parent_bones
+    def align_tweak_mch_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().align_tweak_mch_chain()
+    
+    @stage.rig_bones
+    def rig_tweak_mch_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().rig_tweak_mch_chain()
+
+    ####################################################
+    # Tweak chain
+
+    @stage.generate_bones
+    def make_tweak_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().make_tweak_chain()
+
+    @stage.parent_bones
+    def parent_tweak_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().parent_tweak_chain()
+
+    @stage.parent_bones
+    def align_tweak_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().align_tweak_chain()
+
+    @stage.configure_bones
+    def configure_tweak_chain(self):
+        if self.single_segment:
+            pass
+        else:
+            super().configure_tweak_chain()
+
+
+class ArmatureStretchyRig(SingleSegmentStretchyRig):
+    """
+    Base stretchy rig with additional MCH layer for more complex mechanics
+    """
+
+    def initialize(self):
+        super().initialize()
+
+        self.arma_mch = False
+
+    ####################################################
+    # Tweak Targets
+
+    def check_mch_parents(self):
+        if self.arma_mch:
+            return self.bones.mch.arma
+        else:
+            return super().check_mch_parents()
+
+    def check_mch_targets(self):
+        if self.arma_mch:
+            return threewise_nozip(self.check_mch_parents())
+        else:
+            return super().check_mch_targets()
+
+    ####################################################
+    # Tweak MCH chain
+
+    @stage.rig_bones
+    def rig_tweak_mch_chain(self):
+        if self.arma_mch:
+            mch = self.bones.mch
+            targets = self.check_mch_targets()
+
+            for i, mch, p, c, n  in zip(count(0), mch.tweak, *targets):
+                self.rig_tweak_mch_bone(i, mch, self.root_bone, p, c, n)
+        else:
+            super().rig_tweak_mch_chain()
+
+    ####################################################
+    # Armature MCHs
+
+    @stage.generate_bones
+    def make_arma_mch_chain(self):
+        if self.arma_mch:
+            orgs = self.bones.org
+            self.bones.mch.arma = map_list(self.make_arma_mch_bone, count(0), orgs + orgs[-1:])
+
+    def make_arma_mch_bone(self, i, org):
+        name = make_derived_name(org, 'mch', '_arma')
+        name = self.copy_bone(org, name, parent=False)
+
+        if i == len(self.bones.org):
+            put_bone(self.obj, name, self.get_bone(org).tail)
+        
+        return name
+    
+    @stage.parent_bones
+    def parent_arma_mch_chain(self):
+        if self.arma_mch:
+            for arma in self.bones.mch.arma:
+                self.set_bone_parent(arma, self.bones.mch.bend)
+    
+    @stage.parent_bones
+    def align_arma_mch_chain(self):
+        if self.arma_mch:
+            for arma in self.bones.mch.arma:
+                align_bone_orientation(self.obj, arma, self.bones.mch.bend)
+
+# Combine from the following
+
+
+class StraightStretchyRig(SingleSegmentStretchyRig):
     """
     Stretchy rig with aligned controls
     """
@@ -201,7 +411,7 @@ class StraightStretchyRig(BaseStretchyRig):
     def initialize(self):
         super().initialize()
 
-        self.straight = self.params.straight
+        self.straight = False if self.single_segment else self.params.straight
         self.straight_orientation = self.params.straight_orientation
 
     ##############################
@@ -245,7 +455,7 @@ class StraightStretchyRig(BaseStretchyRig):
 
         params.straight = bpy.props.BoolProperty(
             name="Straighten CTRLs",
-            default=True,
+            default=False,
             description="Align stretch controls to form a straight line by default"
         )
 
@@ -267,7 +477,7 @@ class StraightStretchyRig(BaseStretchyRig):
         super().parameters_ui(layout, params)
 
 
-class ComplexStretchStretchyRig(BaseStretchyRig, ComplexStretchBendyRig):
+class ComplexStretchStretchyRig(SingleSegmentStretchyRig, ComplexStretchBendyRig):
     """
     Stretchy rig with copied stretch constraints for better non-uniform scalability
     """
@@ -284,31 +494,200 @@ class ComplexStretchStretchyRig(BaseStretchyRig, ComplexStretchBendyRig):
                 self.rig_deform_mch_bone(*args)
 
 
-class BendyStretchyRig(BaseStretchyRig):
+class ParentedStretchyRig(SingleSegmentStretchyRig):
+    """
+    Stretchy rig with armature constrained start and end handles
+    """
+
+    def initialize(self):
+        super().initialize()
+
+        self.parent_start = self.params.parent_start
+        self.parent_end = self.params.parent_end
+
+    ##############################
+    # Control MCH
+
+    @stage.generate_bones
+    def make_control_start_mch(self):
+        if self.parent_start:
+            orgs = self.bones.org
+            start = make_derived_name(orgs[0], 'mch', "_in")
+            start = self.bones.mch.start = self.copy_bone(orgs[0], start, parent=False)
+
+    @stage.apply_bones
+    def parent_control_start_mch(self):
+        if self.parent_start:
+            self.set_bone_parent(self.bones.mch.start, self.root_bone)
+
+    @stage.apply_bones
+    def apply_control_start_mch(self):
+        if real_bone(self.obj, self.parent_start):
+            self.get_bone(self.bones.mch.start).parent = None
+
+    @stage.rig_bones
+    def rig_control_start_mch(self):
+        if real_bone(self.obj, self.parent_start):
+            owner = self.get_bone(self.bones.mch.start)
+            make_armature_constraint(self.obj, owner, [self.parent_start])
+
+    @stage.generate_bones
+    def make_control_end_mch(self):
+        if self.parent_end:
+            orgs = self.bones.org
+            end = make_derived_name(orgs[-1], 'mch', "_out")
+            end = self.bones.mch.end = self.copy_bone(orgs[-1], end, parent=False)
+            put_bone(self.obj, end, self.get_bone(orgs[-1]).tail)
+
+    @stage.apply_bones
+    def parent_control_end_mch(self):
+        if self.parent_end:
+            self.set_bone_parent(self.bones.mch.end, self.root_bone)
+
+    @stage.apply_bones
+    def apply_control_end_mch(self):
+        if real_bone(self.obj, self.parent_end):
+            self.get_bone(self.bones.mch.end).parent = None
+
+    @stage.rig_bones
+    def rig_control_end_mch(self):
+        if real_bone(self.obj, self.parent_end):
+            owner = self.get_bone(self.bones.mch.end)
+            make_armature_constraint(self.obj, owner, [self.parent_end])
+
+    ##############################
+    # Stretch control
+
+    @stage.parent_bones
+    def parent_control_chain(self):
+        super().parent_control_chain()
+        ctrls = self.bones.ctrl
+        mchs = self.bones.mch
+        if self.parent_start:
+            self.set_bone_parent(ctrls.start, mchs.start)
+        if self.parent_end:
+            self.set_bone_parent(ctrls.end, mchs.end)
+            
+    ####################################################
+    # UI
+
+    def parent_ui(self, layout, params):
+        box = layout.box()
+        box.row().prop(params, 'parent_start')
+        box.row().prop(params, 'parent_end')
+
+    ####################################################
+    # SETTINGS
+
+    @classmethod
+    def add_parameters(self, params):
+        super().add_parameters(params)
+
+        params.parent_start = bpy.props.StringProperty(
+            name="Start Parent",
+            default="",
+            description="Set the parent for the start handle of the stretchy control curve"
+        )
+
+        params.parent_end = bpy.props.StringProperty(
+            name="End Parent",
+            default="",
+            description="Set the parent for the end handle of the stretchy control curve"
+        )
+
+    @classmethod
+    def parameters_ui(self, layout, params):
+        self.parent_ui(self, layout, params)
+        super().parameters_ui(layout, params)
+
+
+class ScalingStretchyRig(SingleSegmentStretchyRig):
+    """
+    Stretchy rig with volume scaling control
+    """
+
+    def initialize(self):
+        super().initialize()
+
+        self.scale_control = self.params.scale_control
+        self.scale_space = self.params.scale_space
+
+    ##############################
+    # Deform MCH
+
+    @stage.configure_bones
+    def configure_deform_mch_chain(self):
+        if real_bone(self.obj, self.scale_control) and hasattr(self, 'complex_stretch') and self.complex_stretch:
+            for mch in self.bones.mch.deform:
+                self.make_constraint(mch, 'COPY_SCALE', self.scale_control,
+                    target_space=self.scale_space, owner_space=self.scale_space)
+    
+    ##############################
+    # Deform
+
+    @stage.configure_bones
+    def configure_deform_chain(self):
+        if real_bone(self.obj, self.scale_control) and (not hasattr(self, 'complex_stretch') or not self.complex_stretch):
+            for deform in self.bones.deform:
+                self.make_constraint(deform, 'COPY_SCALE', self.scale_control,
+                    target_space=self.scale_space, owner_space=self.scale_space)
+
+    ####################################################
+    # UI
+
+    def scale_ui(self, layout, params):
+        box = layout.box()
+        box.row().prop(params, 'scale_control')
+        if params.scale_control:
+            box.row().prop(params, 'scale_space', expand=True)
+
+    ####################################################
+    # SETTINGS
+
+    @classmethod
+    def add_parameters(self, params):
+        super().add_parameters(params)
+
+        params.scale_control = bpy.props.StringProperty(
+            name="Volume Copy",
+            default="",
+            description="Copy X/Y scale from this bone"
+        )
+
+        params.scale_space = bpy.props.EnumProperty(
+            items=[
+                ('LOCAL', "Local", "Local"),
+                ('WORLD', "World", "World")
+            ],
+            name="Copy Scale Space",
+            default='LOCAL',
+            description="Target and owner space for scale control"
+        )
+
+    @classmethod
+    def parameters_ui(self, layout, params):
+        self.scale_ui(self, layout, params)
+        super().parameters_ui(layout, params)
+
+
+# Classify these first though
+
+
+class BendyStretchyRig(ArmatureStretchyRig):
     """
     Bendy stretchy rig
     """
     def initialize(self):
         super().initialize()
 
-        self.bend = self.params.bend
+        self.bend = False if self.single_segment else self.params.bend
         self.bend_easein = self.params.bend_easein
         self.bend_easeout = self.params.bend_easeout
+        if self.bend:
+            self.arma_mch = True
 
     ####################################################
-    # Stretch MCHs
-
-    @stage.generate_bones
-    def make_bend_mch(self):
-        orgs = self.bones.org
-        bend = make_derived_name(orgs[0], 'mch', "_bend")
-        self.bones.mch.bend = self.copy_bone(orgs[0], bend, parent=False)
-        self.get_bone(bend).tail = self.get_bone(orgs[-1]).tail
-        align_bone_x_axis(self.obj, bend, self.get_bone(orgs[0]).x_axis)
-
-    @stage.parent_bones
-    def parent_bend_mch(self):
-        self.set_bone_parent(self.bones.mch.bend, self.root_bone)
+    # Bend MCH
 
     @stage.parent_bones
     def ease_bend_mch(self):
@@ -321,18 +700,6 @@ class BendyStretchyRig(BaseStretchyRig):
             bend.bbone_custom_handle_end = self.get_bone(self.bones.ctrl.end)
             bend.bbone_easein = self.bend_easein
             bend.bbone_easeout = self.bend_easeout
-    
-    @stage.rig_bones
-    def rig_bend_mch(self):
-        if self.bend:
-            ctrls = self.bones.ctrl
-            mchs = self.bones.mch
-            start = ctrls.start
-            end = ctrls.end
-            self.make_constraint(mchs.bend, 'COPY_LOCATION', start)
-            self.make_constraint(mchs.bend, 'DAMPED_TRACK', end)
-            self.make_constraint(mchs.bend, 'COPY_SCALE', mchs.stretch)
-            self.bendy_drivers(mchs.bend, start, end)
 
     ####################################################
     # Armature MCHs
@@ -393,7 +760,7 @@ class BendyStretchyRig(BaseStretchyRig):
         super().parameters_ui(layout, params)
 
 
-class CurvyStretchyRig(BaseStretchyRig):
+class CurvyStretchyRig(ArmatureStretchyRig):
     """
     Stretchy rig with curve control
     """
@@ -401,7 +768,12 @@ class CurvyStretchyRig(BaseStretchyRig):
     def initialize(self):
         super().initialize()
 
-        self.curve_control = self.params.curve_control if len(self.bones.org) > 1 else False
+        self.curve_control = False if self.single_segment else self.params.curve_control
+        self.curve_location = self.params.curve_location
+        self.curve_location_space = self.params.curve_location_space
+
+        if self.curve_control:
+            self.arma_mch = True
 
     ####################################################
     # Utilities
@@ -449,7 +821,8 @@ class CurvyStretchyRig(BaseStretchyRig):
             bone = self.get_bone(curve)
             bone.lock_rotation = (True, True, True)
             bone.lock_rotation_w = True
-            bone.lock_scale[1] = True
+            #bone.lock_scale[1] = True
+            bone.lock_scale = (True, True, True)
 
     @stage.generate_widgets
     def make_curve_widget(self):
@@ -460,6 +833,11 @@ class CurvyStretchyRig(BaseStretchyRig):
                 radius=1,
                 head_tail=0.0,
             )
+    
+    @stage.rig_bones
+    def rig_curve_ctrl(self):
+        if self.curve_control and real_bone(self.obj, self.curve_location):
+            self.make_constraint(self.bones.ctrl.curve, 'COPY_LOCATION', self.curve_location, use_offset=True, space=self.curve_location_space)
 
     ####################################################
     # Curve parent
@@ -481,8 +859,9 @@ class CurvyStretchyRig(BaseStretchyRig):
     def rig_curve_parent_mch(self):
         if self.curve_control:
             ctrls = self.bones.ctrl
-            self.make_constraint(self.bones.mch.curve_parent, 'COPY_TRANSFORMS', ctrls.start)
-            self.make_constraint(self.bones.mch.curve_parent, 'COPY_TRANSFORMS', ctrls.end, influence=0.5)
+            self.make_constraint(self.bones.mch.curve_parent, 'COPY_LOCATION', ctrls.start)
+            self.make_constraint(self.bones.mch.curve_parent, 'COPY_LOCATION', ctrls.end, influence=0.5)
+            self.make_constraint(self.bones.mch.curve_parent, 'COPY_SCALE', self.bones.mch.stretch)#, self.root_bone)
             self.make_constraint(self.bones.mch.curve_parent, 'DAMPED_TRACK', ctrls.end)
 
     ####################################################
@@ -502,18 +881,23 @@ class CurvyStretchyRig(BaseStretchyRig):
     @stage.parent_bones
     def parent_curve_mch_chain(self):
         if self.curve_control:
-            curves = self.bones.mch.curve
-            armas = self.bones.mch.arma[1:-1]
-            for curve, arma in zip(curves, armas):
-                self.set_bone_parent(curve, arma)
+            #curves = self.bones.mch.curve
+            #armas = self.bones.mch.arma[1:-1]
+            #for curve, arma in zip(curves, armas):
+            for curve in self.bones.mch.curve:
+                self.set_bone_parent(curve, self.bones.mch.stretch) #arma)
                 align_bone_orientation(self.obj, curve, self.bones.mch.stretch)
 
     @stage.finalize
     def rig_curve_mch_chain(self):
         if self.curve_control:
             curves = self.bones.mch.curve
+            armas = self.bones.mch.arma[1:-1]
             curves_len = len(curves)
-            for i, curve in zip(count(0), curves):
+            for i, curve, arma in zip(count(0), curves, armas):
+
+                self.make_constraint(curve, 'COPY_LOCATION', arma)
+    
                 # Parabolic influence
                 step = 2 / (curves_len + 1)
                 xval = (i + 1) * step
@@ -521,23 +905,33 @@ class CurvyStretchyRig(BaseStretchyRig):
 
                 self.make_constraint(
                     curve, 'COPY_LOCATION', self.bones.ctrl.curve,
-                    influence=influence, space='LOCAL'
+                    influence=influence, space='LOCAL', use_offset=True
                 )
     
     ####################################################
     # Curve MCHs
 
+    """
     @stage.rig_bones
     def rig_stretch_mch(self):
         super().rig_stretch_mch()
-        self.make_constraint(self.bones.mch.stretch, 'COPY_SCALE', self.bones.ctrl.curve,
-            space='LOCAL', use_offset=True)
+        if self.curve_control:
+            self.make_constraint(self.bones.mch.stretch, 'COPY_SCALE', self.bones.ctrl.curve,
+                space='LOCAL', use_offset=True)
+    """
 
     ####################################################
     # UI
 
     def curve_ui(self, layout, params):
-        layout.row().prop(params, 'curve_control', toggle=True)
+        box = layout.box()
+        box.row().prop(params, 'curve_control', toggle=True)
+        if params.curve_control:
+            box.row().prop(params, 'curve_location')
+            row = box.row()
+            row.prop(params, 'curve_location_space', expand=True)
+            if not params.curve_location:
+                row.enabled = False
 
     ####################################################
     # SETTINGS
@@ -552,196 +946,23 @@ class CurvyStretchyRig(BaseStretchyRig):
             description="Add a controller to alter the curvature from the center"
         )
 
-    @classmethod
-    def parameters_ui(self, layout, params):
-        self.curve_ui(self, layout, params)
-        super().parameters_ui(layout, params)
-
-
-class ParentedStretchyRig(BaseStretchyRig):
-    """
-    Stretchy rig with armature constrained start and end handles
-    """
-
-    def initialize(self):
-        super().initialize()
-
-        self.parent_start = self.params.parent_start
-        self.parent_end = self.params.parent_end
-
-    ##############################
-    # Control MCH
-
-    @stage.generate_bones
-    def make_control_start_mch(self):
-        if self.parent_start:
-            orgs = self.bones.org
-            start = make_derived_name(orgs[0], 'mch', "_in")
-            start = self.bones.mch.start = self.copy_bone(orgs[0], start, parent=False)
-
-    @stage.apply_bones
-    def parent_control_start_mch(self):
-        if self.parent_start:
-            self.set_bone_parent(self.bones.mch.start, self.root_bone)
-
-    @stage.apply_bones
-    def apply_control_start_mch(self):
-        if real_bone(self.obj, self.parent_start):
-            self.get_bone(self.bones.mch.start).parent = None
-
-    @stage.rig_bones
-    def rig_control_start_mch(self):
-        if real_bone(self.obj, self.parent_start):
-            owner = self.get_bone(self.bones.mch.start)
-            make_armature_constraint(self.obj, owner, [self.parent_start])
-
-    @stage.generate_bones
-    def make_control_end_mch(self):
-        if self.parent_end:
-            orgs = self.bones.org
-            end = make_derived_name(orgs[-1], 'mch', "_out")
-            end = self.bones.mch.end = self.copy_bone(orgs[-1], end, parent=False)
-            put_bone(self.obj, end, self.get_bone(orgs[-1]).tail)
-
-    @stage.apply_bones
-    def parent_control_end_mch(self):
-        if self.parent_end:
-            self.set_bone_parent(self.bones.mch.end, self.root_bone)
-
-    @stage.apply_bones
-    def apply_control_end_mch(self):
-        if real_bone(self.obj, self.parent_start):
-            self.get_bone(self.bones.mch.end).parent = None
-
-    @stage.rig_bones
-    def rig_control_end_mch(self):
-        if real_bone(self.obj, self.parent_start):
-            owner = self.get_bone(self.bones.mch.end)
-            make_armature_constraint(self.obj, owner, [self.parent_end])
-
-    ##############################
-    # Stretch control
-
-    @stage.parent_bones
-    def parent_control_chain(self):
-        super().parent_control_chain()
-        ctrls = self.bones.ctrl
-        mchs = self.bones.mch
-        if self.parent_start:
-            self.set_bone_parent(ctrls.start, mchs.start)
-        if self.parent_end:
-            self.set_bone_parent(ctrls.end, mchs.end)
-            
-    ####################################################
-    # UI
-
-    def parent_ui(self, layout, params):
-        box = layout.box()
-        box.row().prop(params, 'parent_start')
-        box.row().prop(params, 'parent_end')
-
-    ####################################################
-    # SETTINGS
-
-    @classmethod
-    def add_parameters(self, params):
-        super().add_parameters(params)
-
-        params.parent_start = bpy.props.StringProperty(
-            name="Start Parent",
+        params.curve_location = bpy.props.StringProperty(
+            name="Curve Location",
             default="",
-            description="Set the parent for the start handle of the stretchy control curve"
+            description="Copy location for curve controller from this bone"
         )
 
-        params.parent_end = bpy.props.StringProperty(
-            name="End Parent",
-            default="",
-            description="Set the parent for the end handle of the stretchy control curve"
-        )
-
-    @classmethod
-    def parameters_ui(self, layout, params):
-        self.parent_ui(self, layout, params)
-        super().parameters_ui(layout, params)
-
-
-class ScalingStretchyRig(BaseStretchyRig):
-    """
-    Stretchy rig with volume scaling control
-    """
-
-    def initialize(self):
-        super().initialize()
-
-        self.scale_control = self.params.scale_control
-        self.scale_space = self.params.scale_space
-
-    ####################################################
-    # Tweak MCH chain
-
-    @stage.rig_bones
-    def rig_tweak_mch_chain(self):
-        if real_bone(self.obj, self.scale_control):
-            mch = self.bones.mch
-            #parents = self.check_mch_parents()
-            targets = self.check_mch_targets()
-
-            for i, mch, p, c, n  in zip(count(0), mch.tweak, *targets):
-                self.rig_tweak_mch_bone(i, mch, self.scale_control, p, c, n)
-
-    ##############################
-    # Deform MCH
-
-    @stage.configure_bones
-    def configure_deform_mch_chain(self):
-        if real_bone(self.obj, self.scale_control) and hasattr(self, 'complex_stretch') and self.complex_stretch:
-            for mch in self.bones.mch.deform:
-                self.make_constraint(mch, 'COPY_SCALE', self.scale_control,
-                    target_space=self.scale_space, owner_space=self.scale_space)
-    
-    ##############################
-    # Deform
-
-    @stage.configure_bones
-    def configure_deform_chain(self):
-        if real_bone(self.obj, self.scale_control) and (not hasattr(self, 'complex_stretch') or not self.complex_stretch):
-            for deform in self.bones.deform:
-                self.make_constraint(deform, 'COPY_SCALE', self.scale_control,
-                    target_space=self.scale_space, owner_space=self.scale_space)
-
-    ####################################################
-    # UI
-
-    def scale_ui(self, layout, params):
-        box = layout.box()
-        box.row().prop(params, 'scale_control')
-        if params.scale_control:
-            box.row().prop(params, 'scale_space', expand=True)
-
-    ####################################################
-    # SETTINGS
-
-    @classmethod
-    def add_parameters(self, params):
-        super().add_parameters(params)
-
-        params.scale_control = bpy.props.StringProperty(
-            name="Volume Copy",
-            default="",
-            description="Copy X/Y scale from this bone"
-        )
-
-        params.scale_space = bpy.props.EnumProperty(
+        params.curve_location_space = bpy.props.EnumProperty(
             items=[
                 ('LOCAL', "Local", "Local"),
                 ('WORLD', "World", "World")
             ],
-            name="Copy Scale Space",
+            name="Curve Copy Space",
             default='LOCAL',
-            description="Target and owner space for scale control"
+            description="Target and owner space for curve location copy"
         )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        self.scale_ui(self, layout, params)
+        self.curve_ui(self, layout, params)
         super().parameters_ui(layout, params)
