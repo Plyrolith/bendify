@@ -303,7 +303,6 @@ class ArmatureLayerManagerPanel(AlmMixIn):
                     if not bendify.alm_compact:
                         extra = split.row(align=True)
                         extra.prop(rigify_layer, "row", text="UI")
-                        extra.enabled = False if i == 28 else True
                         icon = 'RADIOBUT_ON' if rigify_layer.selset else 'RADIOBUT_OFF'
                         extra.prop(rigify_layer, "selset", text="", toggle=True, icon=icon)
                         if rigify_layer.group == 0:
