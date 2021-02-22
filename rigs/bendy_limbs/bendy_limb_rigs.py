@@ -240,9 +240,6 @@ class BaseLimbBendyRig(BaseLimbRig):
         #pbone.bbone_easein = 1.0 if entry.seg_idx and i > 0 else self.joints_ease
         #pbone.bbone_easeout = 1.0 if next_entry and next_entry.seg_idx else self.joints_ease
 
-        #('SegmentEntry', ['org', 'org_idx', 'seg_idx', 'pos'])
-        print('[{o}, {i}, {d}, {p}]'.format(o=entry.org, i=entry.org_idx, d=entry.seg_idx, p=entry.pos))
-
         if not entry.seg_idx is None:
             if entry.seg_idx == 0:
                 if entry.org_idx == 0:
