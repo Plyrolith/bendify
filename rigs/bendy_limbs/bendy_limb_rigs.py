@@ -80,7 +80,9 @@ class BaseLimbBendyRig(BaseLimbRig):
         self.rotation_mode_ik = self.params.rotation_mode_ik
         self.rotation_mode_tweak = self.params.rotation_mode_tweak
         self.tweak_align_default = self.params.tweak_align_default
-        self.joints_ease = self.params.joints_ease
+        self.ease_in = self.params.ease_in
+        self.ease_joints = self.params.ease_joints
+        self.ease_out = self.params.ease_out
         self.keep_axis = 'SWING_Y'
 
     ##############################
@@ -235,9 +237,32 @@ class BaseLimbBendyRig(BaseLimbRig):
         pbone.bbone_handle_type_end = 'TANGENT'
         pbone.bbone_custom_handle_start = self.get_bone(tweak)
         pbone.bbone_custom_handle_end = self.get_bone(next_tweak)
-        pbone.bbone_easein = 1.0 if entry.seg_idx and i > 0 else self.joints_ease
-        pbone.bbone_easeout = 1.0 if next_entry and next_entry.seg_idx else self.joints_ease
+        #pbone.bbone_easein = 1.0 if entry.seg_idx and i > 0 else self.joints_ease
+        #pbone.bbone_easeout = 1.0 if next_entry and next_entry.seg_idx else self.joints_ease
 
+        #('SegmentEntry', ['org', 'org_idx', 'seg_idx', 'pos'])
+        print('[{o}, {i}, {d}, {p}]'.format(o=entry.org, i=entry.org_idx, d=entry.seg_idx, p=entry.pos))
+
+        if not entry.seg_idx is None:
+            if entry.seg_idx == 0:
+                if entry.org_idx == 0:
+                    pbone.bbone_easein = self.ease_in
+                else:
+                    pbone.bbone_easein = self.ease_joints
+            else:
+                pbone.bbone_easein = 1.0
+
+        if next_entry:
+            if not next_entry.seg_idx is None:
+                if next_entry.org_idx == entry.org_idx:
+                    pbone.bbone_easeout = 1.0
+                else:
+                    pbone.bbone_easeout = self.ease_joints
+            else:
+                pbone.bbone_easeout = self.ease_out
+
+
+        
     def rig_deform_bone(self, i, deform, entry, next_entry, tweak, next_tweak):
         '''Added copy scale constraint and bendy driver creation, excluded last deform segment'''
         if tweak and not i == len(self.bones.deform) - 1:
@@ -549,17 +574,32 @@ class BaseLimbBendyRig(BaseLimbRig):
             default=True,
             description='Align joint tweaks to interpolate between limb segments. This only affects the default, property can always be animated.'
         )
-        params.joints_ease = bpy.props.BoolProperty(
-            name='Bendy Joints',
+
+        params.ease_in = bpy.props.BoolProperty(
+            name='Bend In',
             default=False,
-            description='Make joints bendy by default. Sets default ease for joint tweaks to 1.'
+            description='Make incoming joint bendy by default. Sets default ease for joint tweak to 1.'
+        )
+
+        params.ease_joints = bpy.props.BoolProperty(
+            name='Bend Joints',
+            default=False,
+            description='Make main joints bendy by default. Sets default ease for joint tweaks to 1.'
+        )
+
+        params.ease_out = bpy.props.BoolProperty(
+            name='Bend Out',
+            default=False,
+            description='Make outgoing joint bendy by default. Sets default ease for joint tweak to 1.'
         )
 
     @classmethod
     def parameters_ui(self, layout, params):
+        layout.row().prop(params, "tweak_align_default", toggle=True)
         r = layout.row(align=True)
-        r.prop(params, "tweak_align_default", toggle=True)
-        r.prop(params, "joints_ease", toggle=True)
+        r.prop(params, "ease_in", toggle=True)
+        r.prop(params, "ease_joints", toggle=True)
+        r.prop(params, "ease_out", toggle=True)
         layout.row().prop(params, "rotation_mode_ik", text="IK")
         layout.row().prop(params, "rotation_mode_tweak", text="Tweaks")
 
