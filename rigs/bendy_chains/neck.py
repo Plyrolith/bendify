@@ -32,13 +32,13 @@ from rigify.base_rig import stage
 from rigify.rigs.spines.super_head import Rig as SuperHeadRig
 from rigify.rigs.widgets import create_gear_widget
 
-from .bendy_chain_rigs import ConnectingBendyRig
+from .bendy_chain_rigs import ConnectingBendyChainRig
 
 from ...utils.bones import align_bone
 from ...utils.misc import threewise_nozip
 
 
-class Rig(SuperHeadRig, ConnectingBendyRig):
+class Rig(SuperHeadRig, ConnectingBendyChainRig):
     """
     Head rig with long bendy neck support and connect option.
     """
@@ -52,7 +52,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         self.connected_tweak = None
         self.tip_bone = None
 
-        ConnectingBendyRig.initialize(self)
+        ConnectingBendyChainRig.initialize(self)
 
         self.incoming_tweak_mch = None
         self.long_neck = len(self.bones.org) > 3
@@ -60,7 +60,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
         self.rotation_bones = []
 
     def prepare_bones(self):
-        ConnectingBendyRig.prepare_bones(self)
+        ConnectingBendyChainRig.prepare_bones(self)
 
     ####################################################
     # Main control bones  
@@ -101,7 +101,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     @stage.parent_bones
     def set_incoming_connection(self):
         '''Get incoming tweak mch, if existing'''
-        ConnectingBendyRig.set_incoming_connection(self)
+        ConnectingBendyChainRig.set_incoming_connection(self)
         
         if hasattr(self, 'rigify_parent'):
             parent = self.rigify_parent
@@ -176,14 +176,14 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
  
     @stage.generate_bones
     def make_tweak_chain(self):
-        ConnectingBendyRig.make_tweak_chain(self)
+        ConnectingBendyChainRig.make_tweak_chain(self)
     #    # No tweak for head tip
     #    orgs = self.bones.org
     #    self.bones.ctrl.tweak = map_list(self.make_tweak_bone, count(0), orgs)
 
     @stage.parent_bones
     def parent_tweak_chain(self):
-        ConnectingBendyRig.parent_tweak_chain(self)
+        ConnectingBendyChainRig.parent_tweak_chain(self)
     
     @stage.parent_bones
     def align_tweak_chain(self):
@@ -192,7 +192,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
             length = self.get_bone(tweak[-3]).length
             self.get_bone(tweak[-1]).length = length
             self.get_bone(tweak[-2]).length = length
-        ConnectingBendyRig.align_tweak_chain(self)
+        ConnectingBendyChainRig.align_tweak_chain(self)
 
     @stage.parent_bones
     def resize_last_tweak(self):
@@ -204,7 +204,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
             last.length /= 12
 
     def configure_tweak_bone(self, i, tweak):
-        ConnectingBendyRig.configure_tweak_bone(self, i, tweak)
+        ConnectingBendyChainRig.configure_tweak_bone(self, i, tweak)
 
     @stage.rig_bones
     def generate_neck_tweak_widget(self):
@@ -266,7 +266,7 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     @stage.parent_bones
     def ease_deform_chain(self):
         if self.has_neck:
-            ConnectingBendyRig.ease_deform_chain(self)
+            ConnectingBendyChainRig.ease_deform_chain(self)
 
     @stage.rig_bones
     def rig_deform_chain(self):

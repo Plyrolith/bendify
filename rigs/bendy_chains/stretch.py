@@ -22,9 +22,9 @@ import bpy
 
 from rigify.utils.layers import ControlLayersOption
 
-from .stretchy_chain_rigs import BendyStretchyRig, ComplexStretchStretchyRig, ParentedStretchyRig, ScalingStretchyRig, CurvyStretchyRig, StraightStretchyRig
+from .bendy_stretch_rigs import EasingBendyStretchRig, ComplexBendyStretchRig, HarmonicScaleStretchRig, ParentedBendyStretchRig, ScalingBendyStretchRig, AlignedBendyStretchRig, CurvyBendyStretchRig, StraightBendyStretchRig
 
-class Rig(BendyStretchyRig, CurvyStretchyRig, ScalingStretchyRig, ParentedStretchyRig, StraightStretchyRig, ComplexStretchStretchyRig):
+class Rig(CurvyBendyStretchRig, HarmonicScaleStretchRig, ScalingBendyStretchRig, AlignedBendyStretchRig, ParentedBendyStretchRig, StraightBendyStretchRig, ComplexBendyStretchRig):
     """
     Most basic stretchy chain
     """
@@ -34,11 +34,14 @@ class Rig(BendyStretchyRig, CurvyStretchyRig, ScalingStretchyRig, ParentedStretc
     
     @classmethod
     def parameters_ui(self, layout, params):
-        self.curve_ui(self, layout, params)
         self.bend_ui(self, layout, params)
+        self.harmonic_scale_ui(self, layout, params)
         self.straight_ui(self, layout, params)
         self.parent_ui(self, layout, params)
         self.scale_ui(self, layout, params)
+        self.align_ui(self, layout, params)
+        self.volume_stretch_ui(self, layout, params)
+        self.volume_deform_ui(self, layout, params)
         self.complex_stretch_ui(self, layout, params)
         self.rotation_mode_tweak_ui(self, layout, params)
         self.org_transform_ui(self, layout, params)

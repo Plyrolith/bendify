@@ -20,7 +20,7 @@
 
 import bpy
 
-from rigify.utils.bones import align_bone_roll, align_bone_y_axis, get_bone
+from rigify.utils.bones import align_bone_roll, align_bone_x_axis, align_bone_y_axis, align_bone_z_axis, get_bone
 
 
 #=============================================
@@ -36,7 +36,9 @@ def real_bone(obj, bone_name):
 #=============================================
 
 def distance(obj, bone_name1, bone_name2, tail=False):
-    '''Return the distance between two bone heads (or tails)'''
+    '''
+    Return the distance between two bone heads (or tails)
+    '''
     bone1 = get_bone(obj, bone_name1)
     bone2 = get_bone(obj, bone_name2)
     pos1 = bone1.tail if tail else bone1.head
@@ -48,12 +50,53 @@ def distance(obj, bone_name1, bone_name2, tail=False):
 # Aligning
 #=============================================
 
-def align_bone(obj, bone_name, prev_target, roll_target, next_target, reverse=False):
-    '''Realign bone between two target bones and copy bone roll'''
+def align_bone_to_bone_axis(obj, bone1, bone2, axis='Y', preserve='X'):
+    '''
+    Matches the bone y-axis to specified axis of another bone
+    '''
+    bone1_e = obj.data.edit_bones[bone1]
+    bone2_e = obj.data.edit_bones[bone2]
+    length = bone1_e.length
+
+    # Get preservation vector
+    if preserve == 'X':
+        vec_preserve = bone1_e.x_axis
+    elif preserve == 'Z':
+        vec_preserve = bone1_e.z_axis
+    
+    # Get vector for Y alignment
+    if axis.endswith('X'):
+        vec_axis = bone2_e.x_axis
+    elif axis.endswith('Y'):
+        vec_axis = bone2_e.y_axis
+    elif axis.endswith('Z'):
+        vec_axis = bone2_e.z_axis
+    
+    if axis.startswith('-'):
+        vec_axis.negate()
+    
+    # Align Y
+    align_bone_y_axis(obj, bone1, vec_axis)
+
+    # Roll to preserved axis
+    if preserve == 'X':
+        align_bone_x_axis(obj, bone1, vec_preserve)
+    elif preserve == 'Z':
+        align_bone_z_axis(obj, bone1, vec_preserve)
+    
+    # Restore length
+    bone1_e.length = length
+
+def align_bone(obj, bone_name, prev_target, roll_target, next_target, prev_tail=False, next_tail=False):
+    '''
+    Realign bone between two target bones and copy bone roll
+    '''
     if prev_target and next_target:
         n = get_bone(obj, next_target)
         p = get_bone(obj, prev_target)
-        vec = p.head - n.head if reverse else n.head - p.head
+        p_vec = p.tail if prev_tail else p.head
+        n_vec = n.tail if next_tail else n.head
+        vec = n_vec - p_vec
         align_bone_y_axis(obj, bone_name, vec)
         if roll_target:
             align_bone_roll(obj, bone_name, roll_target)

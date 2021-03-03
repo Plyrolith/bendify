@@ -147,9 +147,23 @@ widgets_dict = {
     'IKARROW':
     {
         "name": "IK Arrow",
-        "icon": 'FORWARD',
+        "icon": 'UV_SYNC_SELECT',
         "function": create_ikarrow_widget,
         "kwargs": ["size"],
+    },
+    'SIMPLE_ARROW':
+    {
+        "name": "Simple Arrow",
+        "icon": 'SORT_DESC',
+        "function": create_simple_arrow_widget,
+        "kwargs": ["size", "invert"],
+    },
+    'WIDE_ARROW':
+    {
+        "name": "Wide Arrow",
+        "icon": 'INDIRECT_ONLY_ON',
+        "function": create_wide_arrow_widget,
+        "kwargs": ["size", "invert"],
     },
     'HAND':
     {
@@ -297,8 +311,8 @@ class BENDIFY_OT_WidgetsSelect(bpy.types.Operator):
 
     def invoke(self, context, event):
         self.widget = 'KEEP'
-        self.radius = 1.0
-        self.size = 1.0
+        #self.radius = 1.0
+        #self.size = 1.0
         return context.window_manager.invoke_props_popup(self, event)
 
 

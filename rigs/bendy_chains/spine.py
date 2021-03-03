@@ -31,12 +31,12 @@ from rigify.rigs.widgets import create_gear_widget
 
 from rigify.rigs.spines.basic_spine import Rig as SpineRig
 
-from .bendy_chain_rigs import BaseBendyRig
+from .bendy_chain_rigs import BendyChainRig
 
 from ...utils.misc import threewise_nozip
 
 
-class Rig(SpineRig, BaseBendyRig):
+class Rig(SpineRig, BendyChainRig):
     """
     Bendy spine rig with fixed pivot, hip/chest controls and tweaks.
     """
@@ -92,10 +92,10 @@ class Rig(SpineRig, BaseBendyRig):
 
     @stage.parent_bones
     def parent_tweak_chain(self):
-        BaseBendyRig.parent_tweak_chain(self)
+        BendyChainRig.parent_tweak_chain(self)
 
     def configure_tweak_bone(self, i, tweak):
-        BaseBendyRig.configure_tweak_bone(self, i, tweak)
+        BendyChainRig.configure_tweak_bone(self, i, tweak)
 
     ####################################################
     # Deform bones
@@ -113,7 +113,7 @@ class Rig(SpineRig, BaseBendyRig):
             self.rig_deform_bone(*args)
 
     def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
-        BaseBendyRig.rig_deform_bone(self, i, deform, tweak, next_tweak)
+        BendyChainRig.rig_deform_bone(self, i, deform, tweak, next_tweak)
 
     @stage.configure_bones
     def configure_bbone_chain(self):
@@ -183,6 +183,7 @@ class Rig(SpineRig, BaseBendyRig):
         self.pivot_ui(self, layout, params)
         self.chest_hips_ui(self, layout, params)
         self.bbones_ui(self, layout, params)
+        self.volume_deform_ui(self, layout, params)
         ControlLayersOption.FK.parameters_ui(layout, params)
 
 
