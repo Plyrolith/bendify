@@ -45,24 +45,22 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
 
     def initialize(self):
         '''Don't use basic connection; bendy init, neck checks'''
+        super().initialize()
         self.create_head_def = self.params.create_head_def
 
         # Deactivate
         self.use_connect_chain = False
         self.connected_tweak = None
-        self.tip_bone = None
+        self.parent_end = None
 
         ConnectingChainBendyRig.initialize(self)
 
-        self.incoming_tweak_mch = None
+        self.parent_start_tweak_mch = None
         self.long_neck = len(self.bones.org) > 3
         self.has_neck = len(self.bones.org) > 1
         self.rotation_bones = []
 
         self.bbone_handles == 'TANGENT'
-
-    def prepare_bones(self):
-        ConnectingChainBendyRig.prepare_bones(self)
 
     ####################################################
     # Main control bones  
@@ -99,27 +97,27 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
 
     ####################################################
     # Incoming Tweak
-
+    """
     @stage.parent_bones
     def set_incoming_connection(self):
         '''Get incoming tweak mch, if existing'''
-        ConnectingChainBendyRig.set_incoming_connection(self)
         
         if hasattr(self, 'rigify_parent'):
             parent = self.rigify_parent
-            if parent and self.incoming_tweak and hasattr(parent.bones, 'mch') and hasattr(parent.bones.mch, 'tweak'):
-                if self.get_bone_parent(self.incoming_tweak) in parent.bones.mch.tweak:
-                    self.incoming_tweak_mch = self.get_bone_parent(self.incoming_tweak)
+            if parent and self.parent_start and hasattr(parent.bones, 'mch') and hasattr(parent.bones.mch, 'tweak'):
+                if self.get_bone_parent(self.parent_start) in parent.bones.mch.tweak:
+                    self.parent_start_tweak_mch = self.get_bone_parent(self.parent_start)
 
     @stage.apply_bones
     def apply_tweak_incoming(self):
-        if self.incoming_tweak and not self.incoming_tweak_mch:
+        if self.incoming_tweak and not self.parent_start_tweak_mch:
             self.set_bone_parent(self.incoming_tweak, self.bones.ctrl.neck)
     
     @stage.rig_bones
     def rig_mch_tweak_incoming(self):
-        if self.incoming_tweak and self.incoming_tweak_mch and self.has_neck:
-            self.make_constraint(self.incoming_tweak_mch, 'COPY_LOCATION', self.bones.ctrl.neck)
+        if self.incoming_tweak and self.parent_start_tweak_mch and self.has_neck:
+            self.make_constraint(self.parent_start_tweak_mch, 'COPY_LOCATION', self.bones.ctrl.neck)
+    """
 
     ####################################################
     # Tweak MCH chain
@@ -367,10 +365,17 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
 
     @classmethod
     def parameters_ui(self, layout, params):
-        self.head_def_ui(self, layout, params)
-        self.incoming_ui(self, layout, params)
-        self.rotation_mode_tweak_ui(self, layout, params)
-        self.bbones_ui(self, layout, params)
+        box = layout.box()
+        self.head_def_ui(self, box, params)
+        self.parent_start_ui(self, box, params)
+        layout.row().prop(params, 'show_advanced')
+        if params.show_advanced:
+            box = layout.box()
+            #self.complex_stretch_ui(self, box, params)
+            self.rotation_mode_tweak_ui(self, box, params)
+            self.volume_ui(self, box, params)
+        box = layout.box()
+        self.bbones_ui(self, box, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 def create_sample(obj):

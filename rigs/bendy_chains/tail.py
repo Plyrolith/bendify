@@ -35,7 +35,7 @@ class Rig(RotMechChainBendyRig, SegmentedChainBendyRig, MasterControlChainBendyR
     def initialize(self):
         super().initialize()
 
-        self.tip_bone = None
+        self.parent_end = None
 
     ####################################################
     # Rotation follow
@@ -55,12 +55,19 @@ class Rig(RotMechChainBendyRig, SegmentedChainBendyRig, MasterControlChainBendyR
 
     @classmethod
     def parameters_ui(self, layout, params):
-        self.master_control_ui(self, layout, params)
-        self.segmented_fk_ui(self, layout, params)
-        self.incoming_ui(self, layout, params)
-        self.rotation_mode_tweak_ui(self, layout, params)
-        self.org_transform_ui(self, layout, params)
-        self.bbones_ui(self, layout, params)
+        box = layout.box()
+        self.master_control_ui(self, box, params)
+        self.segmented_fk_ui(self, box, params)
+        self.parent_start_ui(self, box, params)
+        layout.row().prop(params, 'show_advanced')
+        if params.show_advanced:
+            box = layout.box()
+            #self.complex_stretch_ui(self, box, params)
+            self.rotation_mode_tweak_ui(self, box, params)
+            self.org_transform_ui(self, box, params)
+            self.volume_ui(self, box, params)
+        box = layout.box()
+        self.bbones_ui(self, box, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 def create_sample(obj):

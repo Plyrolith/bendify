@@ -30,10 +30,9 @@ from rigify.utils.bones import align_bone_orientation, align_bone_roll, align_bo
 from rigify.utils.widgets_basic import create_bone_widget
 from rigify.rigs.widgets import create_ballsocket_widget
 
-from ...bendy_rigs import HandleBendyRig, ComplexBendyRig, ConnectingBendyRig, AlignedBendyRig
+from ...bendy_rigs import HandleBendyRig, ComplexBendyRig, AlignedBendyRig, ConnectingBendyRig
 from ...utils.bones import align_bone_to_bone_axis, align_bone, distance, real_bone
 from ...utils.misc import threewise_nozip
-
 
 class ChainBendyRig(HandleBendyRig):
     """
@@ -93,9 +92,11 @@ class ChainBendyRig(HandleBendyRig):
 
     @stage.configure_bones
     def configure_tweak_chain(self):
-        super().configure_tweak_chain()
+        tweaks = self.bones.ctrl.tweak
+        for args in zip(count(0), tweaks):
+            self.configure_tweak_bone(*args)
 
-        ControlLayersOption.TWEAK.assign(self.params, self.obj, self.bones.ctrl.tweak)
+        ControlLayersOption.TWEAK.assign(self.params, self.obj, tweaks)
 
     ####################################################
     # Deform bones
@@ -116,24 +117,36 @@ class ChainBendyRig(HandleBendyRig):
 
 # Frankensteined classes
 
-class ComplexChainBendyRig(ComplexBendyRig, ChainBendyRig):
-    """
-    Bendy chain rig with copied stretch constraints for better non-uniform scalability
-    """
-
-
-class ConnectingChainBendyRig(ConnectingBendyRig, ChainBendyRig):
-    """
-    Bendy chain rig that can connect to a (tweak of its) parent, as well as attach its tip to another bone.
-    """
-
-
 class AlignedChainBendyRig(AlignedBendyRig, ChainBendyRig):
     """
     Bendy chain rig with start and end Y-alignment
     """
 
+
+class ConnectingChainBendyRig(ConnectingBendyRig, ChainBendyRig):
+    """
+    Bendy rig that can connect to a (tweak of its) parent, as well as attach its tip to another bone.
+    """
+
+
+class ComplexChainBendyRig(ComplexBendyRig, ChainBendyRig):
+    """
+    Bendy chain rig with copied stretch constraints for better non-uniform scalability
+    """
+
+    ##############################
+    # Deform MCH
+
+    @stage.rig_bones
+    def rig_deform_mch_chain(self):
+        if self.complex_stretch:
+            ctrls = self.bones.ctrl
+            for args in zip(count(0), self.bones.mch.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
+                self.rig_deform_mch_bone(*args)
+
+
 # End of Frankensteined classes... following are specific to Bendy Chains; still combinable!
+
 
 class SegmentedChainBendyRig(ChainBendyRig):
     """
@@ -410,8 +423,9 @@ class RotMechChainBendyRig(ChainBendyRig):
 
     def get_parent_parent_mch(self, default_bone):
         """ Return the parent's master control bone if connecting and found. """
-
-        if not self.incoming == 'NONE' and self.rigify_parent and hasattr(self.rigify_parent.bones.ctrl, 'master'):
+        parents = ('PARENT', 'TWEAK')
+        if hasattr(self, 'parent_start_incoming') and self.parent_start_incoming in parents \
+        and self.rigify_parent and hasattr(self.rigify_parent.bones.ctrl, 'master'):
             return self.rigify_parent.bones.ctrl.master
         else:
             return default_bone

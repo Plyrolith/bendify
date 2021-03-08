@@ -22,34 +22,25 @@ import bpy
 
 from rigify.utils.layers import ControlLayersOption
 
-from .stretch_bendy_rigs import EasingStretchBendyRig, ComplexStretchBendyRig, HarmonicScaleStretchRig, ParentedStretchBendyRig, ScalingStretchBendyRig, AlignedStretchBendyRig, CurvyStretchBendyRig, StraightStretchBendyRig
+from ...bendy_rigs import HandleBendyRig, ComplexBendyRig, AlignedBendyRig, ConnectingBendyRig
 
-class Rig(CurvyStretchBendyRig, HarmonicScaleStretchRig, ScalingStretchBendyRig, AlignedStretchBendyRig, ParentedStretchBendyRig, StraightStretchBendyRig, ComplexStretchBendyRig):
+class Rig(ConnectingBendyRig, AlignedBendyRig, ComplexBendyRig):
     """
-    Most basic stretchy chain
+    Simple bendy tweak chain
     """
 
-    ####################################################
-    # SETTINGS
-    
     @classmethod
     def parameters_ui(self, layout, params):
-        box = layout.box()
-        box.label(text="Settings For At Least 2 Segments", icon='INFO')
-        self.bend_ui(self, box, params)
-        self.harmonic_scale_ui(self, box, params)
-        self.straight_ui(self, box, params)
-        layout.prop(params, 'show_advanced')
+        layout.row().prop(params, 'show_advanced')
         if params.show_advanced:
             box = layout.box()
             self.parent_ui(self, box, params)
-            self.scale_ui(self, box, params)
+            self.tip_ui(self, box, params)
             self.align_ui(self, box, params)
-            self.volume_ui(self, box, params)
             self.complex_stretch_ui(self, box, params)
             self.rotation_mode_tweak_ui(self, box, params)
             self.org_transform_ui(self, box, params)
+            self.volume_ui(self, box, params)
         box = layout.box()
         self.bbones_ui(self, box, params)
-        ControlLayersOption.TWEAK.parameters_ui(layout, params)
-        
+        #ControlLayersOption.TWEAK.parameters_ui(layout, params)
