@@ -24,10 +24,10 @@ from rigify.base_rig import stage
 from rigify.utils.layers import ControlLayersOption
 from rigify.utils.widgets_basic import create_circle_widget
 
-from .bendy_chain_rigs import ConnectingBendyChainRig, MasterControlBendyChainRig, RotMechBendyChainRig, SegmentedBendyChainRig
+from .chain_bendy_rigs import ConnectingChainBendyRig, MasterControlChainBendyRig, RotMechChainBendyRig, SegmentedChainBendyRig
 
 
-class Rig(RotMechBendyChainRig, SegmentedBendyChainRig, MasterControlBendyChainRig, ConnectingBendyChainRig):
+class Rig(RotMechChainBendyRig, SegmentedChainBendyRig, MasterControlChainBendyRig, ConnectingChainBendyRig):
     """
     Bendy tail rig with connect option and rotation switch.
     """

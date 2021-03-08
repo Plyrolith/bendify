@@ -248,15 +248,15 @@ class BaseLimbBendyRig(BaseLimbRig):
         self.parent_bone_chain(self.bones.deform)
 
     @stage.parent_bones
-    def ease_deform_chain(self):
+    def bbone_deform_chain(self):
         '''(New) ease settings on edit bones need to bo set in parenting stage'''
         tweaks = pairwise_nozip(padnone(self.bones.ctrl.tweak))
         entries = pairwise_nozip(padnone(self.segment_table_full))
 
         for args in zip(count(0), self.bones.deform, *tweaks, *entries):
-            self.ease_deform_bone(*args)
+            self.bbone_deform_bone(*args)
         
-    def ease_deform_bone(self, i, deform, tweak, next_tweak, entry, next_entry):
+    def bbone_deform_bone(self, i, deform, tweak, next_tweak, entry, next_entry):
         '''Sub loop function for bbone easing'''
         pbone = self.get_bone(deform)
         pbone.bbone_handle_type_start = 'TANGENT'

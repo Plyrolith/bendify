@@ -35,7 +35,7 @@ from ...utils.bones import align_bone_to_bone_axis, align_bone, distance, real_b
 from ...utils.misc import threewise_nozip
 
 
-class BendyChainRig(HandleBendyRig):
+class ChainBendyRig(HandleBendyRig):
     """
     FK bendy rig
     """
@@ -116,26 +116,26 @@ class BendyChainRig(HandleBendyRig):
 
 # Frankensteined classes
 
-class ComplexBendyChainRig(ComplexBendyRig, BendyChainRig):
+class ComplexChainBendyRig(ComplexBendyRig, ChainBendyRig):
     """
     Bendy chain rig with copied stretch constraints for better non-uniform scalability
     """
 
 
-class ConnectingBendyChainRig(ConnectingBendyRig, BendyChainRig):
+class ConnectingChainBendyRig(ConnectingBendyRig, ChainBendyRig):
     """
     Bendy chain rig that can connect to a (tweak of its) parent, as well as attach its tip to another bone.
     """
 
 
-class AlignedBendyChainRig(AlignedBendyRig, BendyChainRig):
+class AlignedChainBendyRig(AlignedBendyRig, ChainBendyRig):
     """
     Bendy chain rig with start and end Y-alignment
     """
 
 # End of Frankensteined classes... following are specific to Bendy Chains; still combinable!
 
-class SegmentedBendyChainRig(BendyChainRig):
+class SegmentedChainBendyRig(ChainBendyRig):
     """
     Bendy chain with indivdually scaling fk segments
     """
@@ -289,7 +289,7 @@ class SegmentedBendyChainRig(BendyChainRig):
         super().parameters_ui(layout, params)
 
 
-class MasterControlBendyChainRig(BendyChainRig):
+class MasterControlChainBendyRig(ChainBendyRig):
     """
     Connecting Bendy with a master controller.
     """
@@ -395,7 +395,7 @@ class MasterControlBendyChainRig(BendyChainRig):
         super().parameters_ui(layout, params)
 
 
-class RotMechBendyChainRig(BendyChainRig):
+class RotMechChainBendyRig(ChainBendyRig):
     """
     Connecting Bendy rig that can copy or cancel its parent's rotation.
     """
@@ -482,7 +482,7 @@ class RotMechBendyChainRig(BendyChainRig):
             self.make_constraint(mch, 'COPY_SCALE', self.follow_bone)
 
 '''
-class ParentSwitchBendyChainRig(BendyChainRig):
+class ParentSwitchChainBendyRig(ChainBendyRig):
     """
     WIP
 
@@ -497,7 +497,7 @@ class ParentSwitchBendyChainRig(BendyChainRig):
         base = self.base_bone
         self.bones.mch.parent = self.copy_bone(base, make_derived_name(strip_org(base), 'mch', '.parent'))
 
-        # Check if self is a RotMechBendyChainRig and only set root if that's the case
+        # Check if self is a RotMechChainBendyRig and only set root if that's the case
         if not hasattr(self, 'rotation_bones'):
             self.root_bone = self.bones.mch.parent
 

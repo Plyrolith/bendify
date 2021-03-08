@@ -191,7 +191,7 @@ widgets_dict = {
         "name": "Gear",
         "icon": 'PREFERENCES',
         "function": create_gear_widget,
-        "kwargs": ["size"],
+        "kwargs": ["radius"],
     },
     'SUB_TWEAK':
     {
@@ -216,13 +216,13 @@ class WidgetNames():
         D = bpy.data
         widgets = {}
         for obj in D.objects:
-            if obj.type == 'ARMATURE':
+            if obj.type == 'ARMATURE' and not obj.data.rigify_layers:
                 for pbone in obj.pose.bones:
                     if pbone.custom_shape:
-                        if pbone.custom_shape in widgets:
-                            widgets[pbone.custom_shape]["bone"] = widgets[pbone.custom_shape]["bone"].split(".")[0]
+                        if not pbone.custom_shape in widgets:
+                            widgets[pbone.custom_shape] = {"rig": obj, "bone": pbone, "multi": False}
                         else:
-                            widgets[pbone.custom_shape] = {"rig": obj.name, "bone": pbone.name}
+                            widgets[pbone.custom_shape]["multi"] = True
         return widgets
 
 
@@ -475,6 +475,7 @@ class BENDIFY_OT_WidgetsNamesFix(bpy.types.Operator, WidgetNames):
     bl_options = {'REGISTER', 'UNDO'}
 
     #multi: bpy.props.BoolProperty(name="Include Multi-User", default=False)
+    position: bpy.props.BoolProperty(name="Fix Position", default=True)
 
     @classmethod
     def poll(cls, context):
@@ -482,13 +483,18 @@ class BENDIFY_OT_WidgetsNamesFix(bpy.types.Operator, WidgetNames):
 
     def execute(self, context):
         changes = 0
+        positions = 0
         widgets = self.collect_widgets()
         for w, v in widgets.items():
-            name_new = "WGT-" + v["rig"] + "_" + v["bone"]
-            if not w.name == name_new:
-                w.name = name_new
-                print(w.name + " renamed to " + name_new)
-                changes += 1
+            name_new = "WGT-" + v["rig"].name + "_" + v["bone"].name
+            if not v["multi"]:
+                if not w.name == name_new:
+                    w.name = name_new
+                    print(w.name + " renamed to " + name_new)
+                    changes += 1
+                if self.position:
+                    obj_to_bone(w, v["rig"], v["bone"].name)
+                    positions += 1
         self.report({'INFO'}, str(changes) + " widgets renamed")
         return {'FINISHED'}
 

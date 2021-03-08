@@ -22,9 +22,9 @@ import bpy
 
 from rigify.utils.layers import ControlLayersOption
 
-from .bendy_stretch_rigs import EasingBendyStretchRig, ComplexBendyStretchRig, HarmonicScaleStretchRig, ParentedBendyStretchRig, ScalingBendyStretchRig, AlignedBendyStretchRig, CurvyBendyStretchRig, StraightBendyStretchRig
+from .stretch_bendy_rigs import EasingStretchBendyRig, ComplexStretchBendyRig, HarmonicScaleStretchRig, ParentedStretchBendyRig, ScalingStretchBendyRig, AlignedStretchBendyRig, CurvyStretchBendyRig, StraightStretchBendyRig
 
-class Rig(CurvyBendyStretchRig, HarmonicScaleStretchRig, ScalingBendyStretchRig, AlignedBendyStretchRig, ParentedBendyStretchRig, StraightBendyStretchRig, ComplexBendyStretchRig):
+class Rig(CurvyStretchBendyRig, HarmonicScaleStretchRig, ScalingStretchBendyRig, AlignedStretchBendyRig, ParentedStretchBendyRig, StraightStretchBendyRig, ComplexStretchBendyRig):
     """
     Most basic stretchy chain
     """
@@ -37,14 +37,15 @@ class Rig(CurvyBendyStretchRig, HarmonicScaleStretchRig, ScalingBendyStretchRig,
         self.bend_ui(self, layout, params)
         self.harmonic_scale_ui(self, layout, params)
         self.straight_ui(self, layout, params)
-        self.parent_ui(self, layout, params)
-        self.scale_ui(self, layout, params)
-        self.align_ui(self, layout, params)
-        self.volume_stretch_ui(self, layout, params)
-        self.volume_deform_ui(self, layout, params)
-        self.complex_stretch_ui(self, layout, params)
-        self.rotation_mode_tweak_ui(self, layout, params)
-        self.org_transform_ui(self, layout, params)
+        layout.prop(params, 'show_advanced')
+        if params.show_advanced:
+            self.parent_ui(self, layout, params)
+            self.scale_ui(self, layout, params)
+            self.align_ui(self, layout, params)
+            self.volume_ui(self, layout, params)
+            self.complex_stretch_ui(self, layout, params)
+            self.rotation_mode_tweak_ui(self, layout, params)
+            self.org_transform_ui(self, layout, params)
         self.bbones_ui(self, layout, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
         

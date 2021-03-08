@@ -32,13 +32,13 @@ from rigify.base_rig import stage
 from rigify.rigs.spines.super_head import Rig as SuperHeadRig
 from rigify.rigs.widgets import create_gear_widget
 
-from .bendy_chain_rigs import ConnectingBendyChainRig
+from .chain_bendy_rigs import ConnectingChainBendyRig
 
 from ...utils.bones import align_bone
 from ...utils.misc import threewise_nozip
 
 
-class Rig(SuperHeadRig, ConnectingBendyChainRig):
+class Rig(SuperHeadRig, ConnectingChainBendyRig):
     """
     Head rig with long bendy neck support and connect option.
     """
@@ -52,15 +52,17 @@ class Rig(SuperHeadRig, ConnectingBendyChainRig):
         self.connected_tweak = None
         self.tip_bone = None
 
-        ConnectingBendyChainRig.initialize(self)
+        ConnectingChainBendyRig.initialize(self)
 
         self.incoming_tweak_mch = None
         self.long_neck = len(self.bones.org) > 3
         self.has_neck = len(self.bones.org) > 1
         self.rotation_bones = []
 
+        self.bbone_handles == 'TANGENT'
+
     def prepare_bones(self):
-        ConnectingBendyChainRig.prepare_bones(self)
+        ConnectingChainBendyRig.prepare_bones(self)
 
     ####################################################
     # Main control bones  
@@ -101,7 +103,7 @@ class Rig(SuperHeadRig, ConnectingBendyChainRig):
     @stage.parent_bones
     def set_incoming_connection(self):
         '''Get incoming tweak mch, if existing'''
-        ConnectingBendyChainRig.set_incoming_connection(self)
+        ConnectingChainBendyRig.set_incoming_connection(self)
         
         if hasattr(self, 'rigify_parent'):
             parent = self.rigify_parent
@@ -176,14 +178,14 @@ class Rig(SuperHeadRig, ConnectingBendyChainRig):
  
     @stage.generate_bones
     def make_tweak_chain(self):
-        ConnectingBendyChainRig.make_tweak_chain(self)
+        ConnectingChainBendyRig.make_tweak_chain(self)
     #    # No tweak for head tip
     #    orgs = self.bones.org
     #    self.bones.ctrl.tweak = map_list(self.make_tweak_bone, count(0), orgs)
 
     @stage.parent_bones
     def parent_tweak_chain(self):
-        ConnectingBendyChainRig.parent_tweak_chain(self)
+        ConnectingChainBendyRig.parent_tweak_chain(self)
     
     @stage.parent_bones
     def align_tweak_chain(self):
@@ -192,7 +194,7 @@ class Rig(SuperHeadRig, ConnectingBendyChainRig):
             length = self.get_bone(tweak[-3]).length
             self.get_bone(tweak[-1]).length = length
             self.get_bone(tweak[-2]).length = length
-        ConnectingBendyChainRig.align_tweak_chain(self)
+        ConnectingChainBendyRig.align_tweak_chain(self)
 
     @stage.parent_bones
     def resize_last_tweak(self):
@@ -204,7 +206,7 @@ class Rig(SuperHeadRig, ConnectingBendyChainRig):
             last.length /= 12
 
     def configure_tweak_bone(self, i, tweak):
-        ConnectingBendyChainRig.configure_tweak_bone(self, i, tweak)
+        ConnectingChainBendyRig.configure_tweak_bone(self, i, tweak)
 
     @stage.rig_bones
     def generate_neck_tweak_widget(self):
@@ -264,9 +266,9 @@ class Rig(SuperHeadRig, ConnectingBendyChainRig):
             self.set_bone_parent(deform[0], self.bones.ctrl.neck)
 
     @stage.parent_bones
-    def ease_deform_chain(self):
+    def bbone_deform_chain(self):
         if self.has_neck:
-            ConnectingBendyChainRig.ease_deform_chain(self)
+            ConnectingChainBendyRig.bbone_deform_chain(self)
 
     @stage.rig_bones
     def rig_deform_chain(self):
@@ -277,8 +279,8 @@ class Rig(SuperHeadRig, ConnectingBendyChainRig):
         if self.has_neck:
             deforms = self.bones.deform[:-1] if self.create_head_def else self.bones.deform
             tweaks = ctrls.tweak
-            for args in zip(count(0), deforms, tweaks, tweaks[1:]):
-                self.rig_deform_bone(*args)#, ctrls.neck)
+            for args in zip(deforms, tweaks, tweaks[1:]):
+                ConnectingChainBendyRig.rig_deform_bone(self, *args, ctrls.neck)
 
             for i, deform in zip(count(0), deforms):
                 self.drivers_deform_roll_bone(i, deform, len(self.bones.deform) - 1)

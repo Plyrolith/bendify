@@ -21,7 +21,7 @@
 import bpy
 
 from rigify.rigs.limbs.arm import Rig as ArmRig
-from .bendy_limb_rigs import BaseLimbBendyRig
+from .limb_bendy_rigs import BaseLimbBendyRig
 
 
 class Rig(BaseLimbBendyRig, ArmRig):

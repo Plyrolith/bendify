@@ -2,6 +2,7 @@ import bpy
 import re
 import unicodedata
 
+
 class BENDIFY_OT_StretchToReset(bpy.types.Operator):
     """Reset Stretch To constraint length for bones"""
     bl_idname = 'pose.stretchto_reset'
@@ -39,6 +40,7 @@ class BENDIFY_OT_StretchToReset(bpy.types.Operator):
                 if c.type == 'STRETCH_TO':
                     c.rest_length = 0
         return {"FINISHED"}
+
 
 class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
     """Mirror Constraints of selected Bones to or from the other side"""
@@ -107,6 +109,7 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
         if pb_active:
             pb_active.id_data.data.bones.active = obj.data.bones[pb_active.name]
         return {"FINISHED"}
+
 
 class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
     """Add armature constraints with targets"""
@@ -230,6 +233,7 @@ class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
                 arma_redistribute(arma)
         return {"FINISHED"}
 
+
 class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
     """Rename objects to match the optimal pattern"""
     bl_idname = 'object.object_names_normalize'
@@ -264,7 +268,7 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
         low_icon = 'FONTPREVIEW' if self.lower else 'FILE_FONT'
         row.prop(self, "lower", expand=True, icon=low_icon)
         row = col.row(align=True)
-        row.prop(self, "widgets", expand=True, icon='VIEW_PAN') 
+        #row.prop(self, "widgets", expand=True, icon='VIEW_PAN') 
         row.prop(self, "data", expand=True, icon='MOD_DATA_TRANSFER')
         row.prop(self, "multi", expand=True, icon='GP_MULTIFRAME_EDITING', emboss=self.data)
         box = col.box()
@@ -356,23 +360,30 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
                     segs[segs.index(seg)] = seg.upper()
             return ".".join(segs)
 
-        def rename(prefix, name, lower=True, widgets=False):
+        def rename(prefix, name, lower=True, widgets=False, widgets_skip=True):
             dash_segs = name.split("-")
             if dash_segs[0] in list(prefixes().values()):
                 prefix = dash_segs[0]
-                name = "-".join(dash_segs[1:])
+                if widgets_skip and (prefix == "WGT"):
+                    new_name = "-".join(dash_segs[1:])
+                else:
+                    new_name = suffix_caps(string_clean("-".join(dash_segs[1:]), lower, dot=True))
+            else:
+                new_name = suffix_caps(string_clean("-".join(dash_segs), lower, dot=True))
             if widgets:
                 prefix = prefix.replace("GEO", "WGT")
-            return "-".join([prefix, suffix_caps(string_clean(name, lower, dot=True))])
+            return "-".join([prefix, new_name])
 
-        objects = context.selected_objects if self.selected else bpy.data.objects
+        objects = [obj for obj in context.selected_objects if not obj.override_library and not obj.library] \
+        if self.selected \
+        else [obj for obj in bpy.data.objects if not obj.override_library and not obj.library]
 
         # Dict for return
         obj_names = {}
         data_names = {}
 
         # Blocklists
-        blocklist = ["WGTS_rig"]
+        blocklist = []
         blocklist_data = []
 
         # Object renaming
@@ -385,7 +396,8 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
                     obj_names[obj] = obj_name_new
 
                 # Data renaming
-                if self.data and obj.data not in blocklist_data and hasattr(obj.data, 'users'):
+                if self.data and obj.data not in blocklist_data and hasattr(obj.data, 'users') \
+                and not obj.data.override_library and not obj.data.library:
                     data_name_new = obj_name_new
 
                     # Multi user data
@@ -394,7 +406,7 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
                         dot_segs = obj_name_new.split(".") if self.multi else obj.data.name.split(".")
                         data_name_new = rename(
                             prefix,
-                            ".".join(dot_segs[:-1]) if dot_segs[-1].isnumeric() else ".".join(dot_segs),
+                            dot_segs[0],#".".join(dot_segs[:-1]) if dot_segs[-1].isnumeric() else ".".join(dot_segs),
                             self.lower,
                             self.widgets
                         )
@@ -404,6 +416,7 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
                         data_names[obj.data] = data_name_new
         
         return (obj_names, data_names)
+
 
 class BENDIFY_OT_MaterialSlotsSwitch(bpy.types.Operator):
     """Convert material slots links for selected objects"""
@@ -457,6 +470,7 @@ class BENDIFY_OT_MaterialSlotsSwitch(bpy.types.Operator):
         col.row().prop(self, 'mode', expand=True)
         col.row().prop(self, 'selected')
         col.row().prop(self, 'unlink')
+
 
 class BENDIFY_OT_MirrorAllWeights(bpy.types.Operator):
     """Mirror all weights from one side to another"""
@@ -531,6 +545,7 @@ class BENDIFY_OT_MirrorAllWeights(bpy.types.Operator):
         col.row().prop(self, 'direction', expand=True)
         col.row().prop(self, 'selected')
         col.row().prop(self, 'locked')
+
 
 class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
     """Switch brush blend method in drawing mode"""

@@ -1,4 +1,4 @@
-#====================== BEGIN GPL LICENSE BLOCK ======================
+# ====================== BEGIN GPL LICENSE BLOCK ======================
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-#======================= END GPL LICENSE BLOCK ========================
+# ======================= END GPL LICENSE BLOCK ========================
 
 # <pep8 compliant>
 
@@ -34,6 +34,7 @@ from .utils.bones import align_bone, align_bone_to_bone_axis, distance, real_bon
 from .utils.misc import threewise_nozip
 from .utils.widgets_bendy import create_sub_tweak_widget
 
+
 class BendyRig(BaseRig):
     """
     Base bendy rig with driven B-Bones
@@ -48,6 +49,7 @@ class BendyRig(BaseRig):
         if len(self.bones.org) < self.min_chain_length:
             self.raise_error("Input to rig type must be a chain of {} or more bones.", self.min_chain_length)
         
+        self.bbones_copy_properties = self.params.bbones_copy_properties
         self.bbone_segments = self.params.bbones_spine
         self.bbone_easein = self.params.bbones_easein
         self.bbone_easeout = self.params.bbones_easeout
@@ -97,15 +99,79 @@ class BendyRig(BaseRig):
     ####################################################
     # B-Bone Utils
 
-    def ease_bbone(self, bone, segments=8, ease_in=1.0, ease_out=1.0, handle_start=None, handle_end=None):
-        pbone = self.get_bone(bone)
-        pbone.bbone_segments = segments
-        pbone.bbone_easein = ease_in
-        pbone.bbone_easeout = ease_out
-        pbone.bbone_handle_type_start = 'TANGENT' if handle_start else 'AUTO'
-        pbone.bbone_handle_type_end = 'TANGENT' if handle_start else 'AUTO'
-        pbone.bbone_custom_handle_start = self.get_bone(handle_start)
-        pbone.bbone_custom_handle_end = self.get_bone(handle_end)
+    def setup_bbone(
+        self,
+        bone,
+        segments=8,
+        easein=1.0,
+        easeout=1.0,
+        handle_start=None,
+        handle_end=None,
+        curveinx=0.0,
+        curveiny=0.0,
+        curveoutx=0.0,
+        curveouty=0.0,
+        rollin=0.0,
+        rollout=0.0,
+        use_endroll_as_inroll=False,
+        scaleinx=1.0,
+        scaleiny=1.0,
+        scaleoutx=1.0,
+        scaleouty=1.0,
+        handle_type_start=None,
+        handle_type_end=None
+        ):
+        bbone = self.get_bone(bone)
+        bbone.bbone_segments = segments
+        #bbone.bbone_x = bbone_x
+        #bbone.bbone_z = bbone_z
+        bbone.bbone_curveinx = curveinx
+        bbone.bbone_curveiny = curveiny
+        bbone.bbone_curveoutx = curveoutx
+        bbone.bbone_curveouty = curveouty
+        bbone.bbone_rollin = rollin
+        bbone.bbone_rollout = rollout
+        bbone.use_endroll_as_inroll = use_endroll_as_inroll
+        bbone.bbone_scaleinx = scaleinx
+        bbone.bbone_scaleiny = scaleiny
+        bbone.bbone_scaleoutx = scaleoutx
+        bbone.bbone_scaleouty = scaleouty
+        bbone.bbone_easein = easein
+        bbone.bbone_easeout = easeout
+        bbone.bbone_custom_handle_start = self.get_bone(handle_start)
+        if handle_type_start:
+            bbone.bbone_handle_type_start = handle_type_start
+        else:
+            bbone.bbone_handle_type_start = 'TANGENT' if handle_start else 'AUTO'
+        bbone.bbone_custom_handle_end = self.get_bone(handle_end)
+        if handle_type_end:
+            bbone.bbone_handle_type_end = handle_type_end
+        else:
+            bbone.bbone_handle_type_end = 'TANGENT' if handle_start else 'AUTO'
+
+    def copy_bbone(self, bbone, bbone_source, handle_start=None, handle_end=None):
+        bbs = self.get_bone(bbone_source)
+        self.setup_bbone(
+            bbone,
+            bbs.bbone_segments,
+            bbs.bbone_easein,
+            bbs.bbone_easeout,
+            handle_start if handle_start else bbs.bbone_custom_handle_start,
+            handle_end if handle_end else bbs.bbone_custom_handle_end,
+            bbs.bbone_curveinx,
+            bbs.bbone_curveiny,
+            bbs.bbone_curveoutx,
+            bbs.bbone_curveouty,
+            bbs.bbone_rollin,
+            bbs.bbone_rollout,
+            bbs.use_endroll_as_inroll,
+            bbs.bbone_scaleinx,
+            bbs.bbone_scaleiny,
+            bbs.bbone_scaleoutx,
+            bbs.bbone_scaleouty,
+            None if handle_start else bbs.bbone_handle_type_start,
+            None if handle_end else bbs.bbone_handle_type_end
+        )
 
     def drivers_bbone_ease(self, bone, handle_start, handle_end):
         pbone = self.get_bone(bone)
@@ -289,6 +355,11 @@ class BendyRig(BaseRig):
         for org, deform in zip(self.bones.org, self.bones.deform):
             self.set_bone_parent(org, deform)
 
+    @stage.apply_bones
+    def bbone_org_chain(self):
+        for org in self.bones.org:
+            self.setup_bbone(org, 1)
+    
     @stage.rig_bones
     def rig_org_chain(self):
         ctrls = self.bones.ctrl
@@ -329,12 +400,15 @@ class BendyRig(BaseRig):
         self.set_bone_parent(deforms[0], self.root_bone)
 
     @stage.parent_bones
-    def ease_deform_chain(self):
+    def bbone_deform_chain(self):
         tweaks = self.bones.ctrl.tweak
-        for i, deform, tweak, next_tweak in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
-            ease_in = 0.0 if i == 0 and not self.bbone_easein else 1.0
-            ease_out = 0.0 if i == len(self.bones.deform) - 1 and not self.bbone_easeout else 1.0
-            self.ease_bbone(deform, self.bbone_segments, ease_in, ease_out, tweak, next_tweak)
+        for i, deform, tweak, next_tweak, org in zip(count(0), self.bones.deform, tweaks, tweaks[1:], self.bones.org):
+            if self.bbones_copy_properties:
+                self.copy_bbone(deform, org)
+            else:
+                ease_in = 0.0 if i == 0 and not self.bbone_easein else 1.0
+                ease_out = 0.0 if i == len(self.bones.deform) - 1 and not self.bbone_easeout else 1.0
+                self.setup_bbone(deform, self.bbone_segments, ease_in, ease_out, tweak, next_tweak)
 
     @stage.rig_bones
     def rig_deform_chain(self):
@@ -373,15 +447,17 @@ class BendyRig(BaseRig):
         layout.row().prop(params, 'org_transform', text="ORGs")
 
     def bbones_ui(self, layout, params):
-        layout.row().prop(params, 'bbones_spine')
-        r = layout.row(align=True)
-        r.prop(params, 'bbones_easein', text="Ease In", toggle=True)
-        r.prop(params, 'bbones_easeout', text="Ease Out", toggle=True)
         r = layout.row(align=True)
         r.prop(params, 'bbone_ease', text="Ease Drivers", toggle=True)
         r.prop(params, 'bbone_scale', text="Scale Drivers", toggle=True)
-    
-    def volume_deform_ui(self, layout, params):
+        layout.row().prop(params, 'bbones_copy_properties')
+        if not params.bbones_copy_properties:
+            r = layout.row(align=True)
+            r.prop(params, 'bbones_easein', text="Ease In", toggle=True)
+            r.prop(params, 'bbones_easeout', text="Ease Out", toggle=True)
+            layout.row().prop(params, 'bbones_spine')
+
+    def volume_ui(self, layout, params):
         r = layout.row(align=True)
         r.prop(params, 'volume_deform_default', slider=True)
         r.prop(params, 'volume_deform_panel', text="", icon='OPTIONS')
@@ -396,6 +472,18 @@ class BendyRig(BaseRig):
     
     @classmethod
     def add_parameters(self, params):
+        params.show_advanced = bpy.props.BoolProperty(
+            name="Show Advanced Settings",
+            default=False,
+            description="Show more settings to fine-tune the rig"
+        )
+
+        params.bbones_copy_properties = bpy.props.BoolProperty(
+            name="Individual B-Bone Properties",
+            default=False,
+            description="Copy original B-Bone settings per bone"
+        )
+
         params.bbones_spine = bpy.props.IntProperty(
             name="B-Bone Segments",
             default=8,
@@ -476,7 +564,7 @@ class BendyRig(BaseRig):
     def parameters_ui(self, layout, params):
         self.org_transform_ui(self, layout, params)
         self.bbones_ui(self, layout, params)
-        self.volume_deform_ui(self, layout, params)
+        self.volume_ui(self, layout, params)
 
 
 # Advanced variations, mixable
@@ -588,14 +676,18 @@ class HandleBendyRig(BendyRig):
     # Deform chain
 
     @stage.parent_bones
-    def ease_deform_chain(self):
+    def bbone_deform_chain(self):
         tweaks = self.bones.ctrl.tweak
-        for i, deform, tweak, next_tweak in zip(count(0), self.bones.deform, tweaks, tweaks[1:]):
-            ease_in = 0.0 if i == 0 and not self.bbone_easein else 1.0
-            ease_out = 0.0 if i == len(self.bones.deform) - 1 and not self.bbone_easeout else 1.0
+        for i, deform, tweak, next_tweak, org in zip(count(0), self.bones.deform, tweaks, tweaks[1:], self.bones.org):
             handle_start = tweak if self.bbone_handles == 'TANGENT' else None
             handle_end = next_tweak if self.bbone_handles == 'TANGENT' else None
-            self.ease_bbone(deform, self.bbone_segments, ease_in, ease_out, handle_start, handle_end)
+            if self.bbones_copy_properties:
+                self.copy_bbone(deform, org, handle_start, handle_end)
+            else:
+                ease_in = 0.0 if i == 0 and not self.bbone_easein else 1.0
+                ease_out = 0.0 if i == len(self.bones.deform) - 1 and not self.bbone_easeout else 1.0
+                self.setup_bbone(deform, self.bbone_segments, ease_in, ease_out, handle_start, handle_end)
+            
 
     ####################################################
     # UI
@@ -605,8 +697,8 @@ class HandleBendyRig(BendyRig):
 
     def bbones_ui(self, layout, params):
         box = layout.box()
-        super().bbones_ui(self, box, params)
         box.row().prop(params, 'bbone_handles', text="Handles", toggle=True)
+        super().bbones_ui(self, box, params)
 
     ####################################################
     # SETTINGS

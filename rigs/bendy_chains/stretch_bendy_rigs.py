@@ -30,7 +30,7 @@ from rigify.utils.widgets_basic import create_bone_widget
 from rigify.utils.widgets_special import create_neck_bend_widget
 
 from ...bendy_rigs import HandleBendyRig, ComplexBendyRig, AlignedBendyRig
-from .bendy_chain_rigs import BendyChainRig
+from .chain_bendy_rigs import ChainBendyRig
 
 from ...utils.bones import align_bone_to_bone_axis, real_bone
 from ...utils.misc import threewise_nozip
@@ -38,7 +38,7 @@ from ...utils.mechanism import make_armature_constraint
 from ...utils.widgets_bendy import create_simple_arrow_widget
 
 
-class BendyStretchRig(HandleBendyRig):
+class StretchBendyRig(HandleBendyRig):
     """
     Base stretchy rig
     """
@@ -201,10 +201,12 @@ class BendyStretchRig(HandleBendyRig):
     ####################################################
     # UI
 
-    def volume_stretch_ui(self, layout, params):
-        r = layout.row(align=True)
+    def volume_ui(self, layout, params):
+        box = layout.box()
+        r = box.row(align=True)
         r.prop(params, 'volume_stretch_default', slider=True)
         r.prop(params, 'volume_stretch_panel', text="", icon='OPTIONS')
+        super().volume_ui(self, box, params)
 
     ####################################################
     # SETTINGS
@@ -231,14 +233,14 @@ class BendyStretchRig(HandleBendyRig):
 
     @classmethod
     def parameters_ui(self, layout, params):
+        self.volume_ui(self, layout, params)
         self.rotation_mode_tweak_ui(self, layout, params)
         self.org_transform_ui(self, layout, params)
         self.bbones_ui(self, layout, params)
-        self.volume_stretch_ui(self, layout, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 
-class SingleSegmentBendyStretchRig(BendyStretchRig):
+class SingleSegmentStretchBendyRig(StretchBendyRig):
     """
     Stretchy rig with reduced complexity for single segment
     """
@@ -356,7 +358,7 @@ class SingleSegmentBendyStretchRig(BendyStretchRig):
             super().make_tweak_widgets()
 
 
-class ArmatureBendyStretchRig(SingleSegmentBendyStretchRig):
+class ArmatureStretchBendyRig(SingleSegmentStretchBendyRig):
     """
     Base stretchy rig with additional MCH layer for more complex mechanics
     """
@@ -427,10 +429,55 @@ class ArmatureBendyStretchRig(SingleSegmentBendyStretchRig):
                 align_bone_orientation(self.obj, arma, self.bones.mch.stretch[0])
 
 
+class ScaleOffsetMixin():
+    """
+    Mix-in class for copy scale driver creation
+    """
+
+    offset_axes = [
+        ('X', "X", "X"),
+        ('Y', "Y", "Y"),
+        ('Z', "Z", "Z")
+    ]
+
+    def bone_scale_offset(self, bone, target, map_x, map_y, map_z, use_x=True, use_y=True, use_z=True):
+        if map_x == 'X' and map_y == 'Y' and map_z == 'Z':
+            self.make_constraint(
+                bone,
+                'COPY_SCALE',
+                target,
+                space='LOCAL',
+                use_offset=True,
+                use_x=use_x,
+                use_y=use_y,
+                use_z=use_z
+            )
+        else:
+            self.make_constraint(
+                bone,
+                'TRANSFORM',
+                target,
+                space='LOCAL',
+                use_motion_extrapolate=True,
+                map_from='SCALE',
+                map_to='SCALE',
+                map_to_x_from=map_x,
+                map_to_y_from=map_y,
+                map_to_z_from=map_z,
+                from_min_x_scale=0,
+                from_min_y_scale=0,
+                from_min_z_scale=0,
+                to_min_x_scale=0 if use_x else 1,
+                to_min_y_scale=0 if use_y else 1,
+                to_min_z_scale=0 if use_z else 1,
+                mix_mode_scale='MULTIPLY'
+                
+            )
+
 ### Combine from the following
 
 
-class HarmonicScaleStretchRig(SingleSegmentBendyStretchRig):
+class HarmonicScaleStretchRig(SingleSegmentStretchBendyRig):
     """
     Stretchy rig with reduced complexity for single segment
     """
@@ -454,10 +501,6 @@ class HarmonicScaleStretchRig(SingleSegmentBendyStretchRig):
     ##############################
     # Tweaks
 
-    """
-    NEEDS CURVEY #FIX
-    """
-
     @stage.rig_bones
     def rig_tweak_chain_scale_offset(self):
         if self.tweak_scale_offset:
@@ -466,19 +509,18 @@ class HarmonicScaleStretchRig(SingleSegmentBendyStretchRig):
             for i, tweak in zip(count(0), ctrls.tweak):
                 if hasattr(self, 'curve_control') and self.curve_control:
                     cp = self.curve_position
-                    third = (i - cp) /  (total - cp)
+                    # Zero divide protection
+                    div = total - cp - 1
+                    third = (i - cp - 1) / div if self.curve_center and div else (i - cp) / (total - cp)
                     first = 1 - (i / cp)
                     second = 1 - first if i <= cp else 1 - third
                 else:
                     second = (i / total)
                     first = 1 - second
                     third = 0
-                if first > 0:
-                    self.make_constraint(tweak, 'COPY_SCALE', ctrls.stretch[0], use_offset=True, use_y=False, space='LOCAL', power=first)
-                if second > 0:
-                    self.make_constraint(tweak, 'COPY_SCALE', ctrls.stretch[1], use_offset=True, use_y=False, space='LOCAL', power=second)
-                if third > 0:
-                    self.make_constraint(tweak, 'COPY_SCALE', ctrls.stretch[2], use_offset=True, use_y=False, space='LOCAL', power=third)
+                for stretch, power in zip(ctrls.stretch, [first, second, third]):
+                    if power > 0:
+                        self.make_constraint(tweak, 'COPY_SCALE', stretch, use_offset=True, use_y=False, space='LOCAL', power=power)
 
     ####################################################
     # UI
@@ -506,7 +548,7 @@ class HarmonicScaleStretchRig(SingleSegmentBendyStretchRig):
         super().parameters_ui(layout, params)
 
 
-class StraightBendyStretchRig(SingleSegmentBendyStretchRig):
+class StraightStretchBendyRig(SingleSegmentStretchBendyRig):
     """
     Stretchy rig with aligned controls
     """
@@ -543,10 +585,8 @@ class StraightBendyStretchRig(SingleSegmentBendyStretchRig):
     def straight_ui(self, layout, params):
         box = layout.box()
         box.row().prop(params, 'straight', toggle=True)
-        r = box.row()
-        r.prop(params, 'straight_orientation', expand=True)
-        if not params.straight:
-            r.enabled = False
+        if params.straight:
+            box.row().prop(params, 'straight_orientation', expand=True)
 
     ####################################################
     # SETTINGS
@@ -563,9 +603,9 @@ class StraightBendyStretchRig(SingleSegmentBendyStretchRig):
 
         params.straight_orientation = bpy.props.EnumProperty(
             items=[
-                ('FIRST', "First", "First"),
-                ('LAST', "Last", "Last"),
-                ('BOTH', "Both", "Both")
+                ('FIRST', "Use First", "Use First"),
+                ('LAST', "Use Last", "Use Last"),
+                ('BOTH', "Individual", "Individual")
             ],
             name="Orientation",
             default='FIRST',
@@ -579,7 +619,7 @@ class StraightBendyStretchRig(SingleSegmentBendyStretchRig):
         super().parameters_ui(layout, params)
 
 
-class ComplexBendyStretchRig(SingleSegmentBendyStretchRig, ComplexBendyRig):
+class ComplexStretchBendyRig(SingleSegmentStretchBendyRig, ComplexBendyRig):
     """
     Stretchy rig with copied stretch constraints for better non-uniform scalability
     """
@@ -607,7 +647,7 @@ class ComplexBendyStretchRig(SingleSegmentBendyStretchRig, ComplexBendyRig):
             super().rig_deform_chain()
 
 
-class ParentedBendyStretchRig(SingleSegmentBendyStretchRig):
+class ParentedStretchBendyRig(SingleSegmentStretchBendyRig, ScaleOffsetMixin):
     """
     Stretchy rig with armature constrained start and end handles
     """
@@ -617,32 +657,56 @@ class ParentedBendyStretchRig(SingleSegmentBendyStretchRig):
 
         self.parent_start = self.params.parent_start
         self.parent_start_scale_offset = self.params.parent_start_scale_offset
+        self.parent_start_scale_x = self.params.parent_start_scale_x
+        self.parent_start_scale_y = self.params.parent_start_scale_y
+        self.parent_start_scale_z = self.params.parent_start_scale_z
+
         self.parent_end = self.params.parent_end
         self.parent_end_scale_offset = self.params.parent_end_scale_offset
+        self.parent_end_scale_x = self.params.parent_end_scale_x
+        self.parent_end_scale_y = self.params.parent_end_scale_y
+        self.parent_end_scale_z = self.params.parent_end_scale_z
 
     ##############################
     # Stretch control
 
     @stage.configure_bones
-    def rig_control_chain_scale_offset(self):
+    def offset_scale_rig_control_chain(self):
         ctrls = self.bones.ctrl.stretch
         if real_bone(self.obj, self.parent_start) and self.parent_start_scale_offset:
-            self.make_constraint(ctrls[0], 'COPY_SCALE', self.parent_start, space='LOCAL', use_offset=True)
+            self.bone_scale_offset(
+                ctrls[0],
+                self.parent_start,
+                self.parent_start_scale_x,
+                self.parent_start_scale_y,
+                self.parent_start_scale_z
+            )
         if real_bone(self.obj, self.parent_end) and self.parent_end_scale_offset:
-            self.make_constraint(ctrls[-1], 'COPY_SCALE', self.parent_end, space='LOCAL', use_offset=True)
-
+            self.bone_scale_offset(
+                ctrls[-1],
+                self.parent_end,
+                self.parent_end_scale_x,
+                self.parent_end_scale_y,
+                self.parent_end_scale_z
+            )
+    
     @stage.generate_widgets
     def make_control_widgets(self):
         ctrls = self.bones.ctrl
         for i, stretch in zip(count(0), ctrls.stretch):
             cst = None
+            arrow = False
             if i == 0 and real_bone(self.obj, self.parent_start):
-                cst = ctrls.tweak[0]
+                if self.parent_start_scale_offset:
+                    cst = ctrls.tweak[0]
                 invert = False
-            elif i == len(ctrls) -1 and real_bone(self.obj, self.parent_end):
-                cst = ctrls.tweak[-1]
+                arrow = True
+            elif i == len(ctrls.stretch) -1 and real_bone(self.obj, self.parent_end):
+                if self.parent_end_scale_offset:
+                    cst = ctrls.tweak[-1]
                 invert = True
-            if cst:
+                arrow = True
+            if arrow:
                 create_simple_arrow_widget(self.obj, stretch, size=0.75, bone_transform_name=cst, invert=invert)
                 self.get_bone(stretch).custom_shape_transform = self.get_bone(cst)
             else:
@@ -718,10 +782,22 @@ class ParentedBendyStretchRig(SingleSegmentBendyStretchRig):
         box = layout.box()
         r = box.row(align=True)
         r.prop(params, 'parent_start')
-        r.prop(params, 'parent_start_scale_offset', text="", icon='CON_SIZELIKE')
+        if params.parent_start:
+            r.prop(params, 'parent_start_scale_offset', text="", icon='CON_SIZELIKE')
+            if params.parent_start_scale_offset:
+                r = box.row()
+                r.prop(params, 'parent_start_scale_x', text="X")
+                r.prop(params, 'parent_start_scale_y', text="Y")
+                r.prop(params, 'parent_start_scale_z', text="Z")
         r = box.row(align=True)
         r.prop(params, 'parent_end')
-        r.prop(params, 'parent_end_scale_offset', text="", icon='CON_SIZELIKE')
+        if params.parent_end:
+            r.prop(params, 'parent_end_scale_offset', text="", icon='CON_SIZELIKE')
+            if params.parent_end_scale_offset:
+                r = box.row()
+                r.prop(params, 'parent_end_scale_x', text="X")
+                r.prop(params, 'parent_end_scale_y', text="Y")
+                r.prop(params, 'parent_end_scale_z', text="Z")
 
     ####################################################
     # SETTINGS
@@ -744,15 +820,58 @@ class ParentedBendyStretchRig(SingleSegmentBendyStretchRig):
 
         params.parent_start_scale_offset = bpy.props.BoolProperty(
             name="Copy Start Parent Scale",
-            default=True,
+            default=False,
             description="Set scale offset for start controller"
         )
 
         params.parent_end_scale_offset = bpy.props.BoolProperty(
             name="Copy End Parent Scale",
-            default=True,
+            default=False,
             description="Set scale offset for end controller"
         )
+
+        params.parent_start_scale_x = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="X Source Axis",
+            default='X',
+            description="Source axis for X scale start offset"
+        )
+
+        params.parent_start_scale_y = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="Y Source Axis",
+            default='Y',
+            description="Source axis for Y scale start offset"
+        )
+
+        params.parent_start_scale_z = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="Z Source Axis",
+            default='Z',
+            description="Source axis for Z scale start offset"
+        )
+
+        params.parent_end_scale_x = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="X Source Axis",
+            default='X',
+            description="Source axis for X scale end offset"
+        )
+
+        params.parent_end_scale_y = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="Y Source Axis",
+            default='Y',
+            description="Source axis for Y scale end offset"
+        )
+
+        params.parent_end_scale_z = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="Z Source Axis",
+            default='Z',
+            description="Source axis for Z scale end offset"
+        )
+
 
     @classmethod
     def parameters_ui(self, layout, params):
@@ -760,7 +879,7 @@ class ParentedBendyStretchRig(SingleSegmentBendyStretchRig):
         super().parameters_ui(layout, params)
 
 
-class ScalingBendyStretchRig(SingleSegmentBendyStretchRig):
+class ScalingStretchBendyRig(SingleSegmentStretchBendyRig, ScaleOffsetMixin):
     """
     Stretchy rig with volume scaling control
     """
@@ -768,19 +887,24 @@ class ScalingBendyStretchRig(SingleSegmentBendyStretchRig):
     def initialize(self):
         super().initialize()
 
-        self.scale_control = self.params.scale_control
-        #self.scale_space = self.params.scale_space
+        self.deform_scale = self.params.deform_scale
+        self.deform_scale_x = self.params.deform_scale_x
+        self.deform_scale_z = self.params.deform_scale_z
 
     ##############################
     # Deform
 
     @stage.finalize
     def offset_scale_deform_chain(self):
-        if real_bone(self.obj, self.scale_control):
+        if real_bone(self.obj, self.deform_scale):
             for deform in self.bones.deform:
-                self.make_constraint(
-                    deform, 'COPY_SCALE', self.scale_control,
-                    use_y=False, space='LOCAL' #self.scale_space
+                self.bone_scale_offset(
+                    deform,
+                    self.deform_scale,
+                    self.deform_scale_x,
+                    'Y',
+                    self.deform_scale_z,
+                    use_y=False
                 )
 
     ####################################################
@@ -788,9 +912,11 @@ class ScalingBendyStretchRig(SingleSegmentBendyStretchRig):
 
     def scale_ui(self, layout, params):
         box = layout.box()
-        box.row().prop(params, 'scale_control')
-        #if params.scale_control:
-        #    box.row().prop(params, 'scale_space', expand=True)
+        box.row().prop(params, 'deform_scale')
+        if params.deform_scale:
+            r = box.row()
+            r.prop(params, 'deform_scale_x', text="X")
+            r.prop(params, 'deform_scale_z', text="Z")
 
     ####################################################
     # SETTINGS
@@ -799,23 +925,25 @@ class ScalingBendyStretchRig(SingleSegmentBendyStretchRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.scale_control = bpy.props.StringProperty(
+        params.deform_scale = bpy.props.StringProperty(
             name="Volume Copy",
             default="",
             description="Copy X/Y scale from this bone"
         )
 
-        '''
-        params.scale_space = bpy.props.EnumProperty(
-            items=[
-                ('LOCAL', "Local", "Local"),
-                ('WORLD', "World", "World")
-            ],
-            name="Copy Scale Space",
-            default='LOCAL',
-            description="Target and owner space for scale control"
+        params.deform_scale_x = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="X Source Axis",
+            default='X',
+            description="Source axis for X scale deform offset"
         )
-        '''
+
+        params.deform_scale_z = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="Z Source Axis",
+            default='Z',
+            description="Source axis for Z scale deform offset"
+        ) 
 
     @classmethod
     def parameters_ui(self, layout, params):
@@ -823,7 +951,7 @@ class ScalingBendyStretchRig(SingleSegmentBendyStretchRig):
         super().parameters_ui(layout, params)
 
 
-class AlignedBendyStretchRig(SingleSegmentBendyStretchRig, AlignedBendyRig):
+class AlignedStretchBendyRig(SingleSegmentStretchBendyRig, AlignedBendyRig):
     """
     Stretchy rig with start and end Y-alignment
     """
@@ -850,7 +978,7 @@ class AlignedBendyStretchRig(SingleSegmentBendyStretchRig, AlignedBendyRig):
 # Classify these first though
 
 
-class EasingBendyStretchRig(ArmatureBendyStretchRig):
+class EasingStretchBendyRig(ArmatureStretchBendyRig):
     """
     Bendy stretchy rig
     """
@@ -900,7 +1028,7 @@ class EasingBendyStretchRig(ArmatureBendyStretchRig):
             ctrls = self.bones.ctrl.stretch
             segments = min(len(self.bones.org) * 3, 32)
             for bend, handle_start, handle_end in zip(self.bones.mch.bend, ctrls, ctrls[1:]):
-                self.ease_bbone(bend, segments, self.bend_easein, self.bend_easeout, handle_start, handle_end)
+                self.setup_bbone(bend, segments, self.bend_easein, self.bend_easeout, handle_start, handle_end)
 
     @stage.rig_bones
     def rig_bend_mch_chain(self):
@@ -987,7 +1115,7 @@ class EasingBendyStretchRig(ArmatureBendyStretchRig):
         super().parameters_ui(layout, params)
 
 
-class CurvyBendyStretchRig(EasingBendyStretchRig):
+class CurvyStretchBendyRig(EasingStretchBendyRig, ScaleOffsetMixin):
     """
     Stretchy rig with curve control
     """
@@ -995,22 +1123,27 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
     def initialize(self):
         super().initialize()
 
-        self.curve_position = self.params.curve_position
-        self.curve_control = False if self.curve_position > len(self.bones.org) - 1 or not self.bend \
-        else self.params.curve_control
-
+        self.curve_control = self.params.curve_control
         self.curve_position = self.params.curve_position
         self.curve_center = self.params.curve_center
         self.curve_control_easein = self.params.curve_control_easein
         self.curve_control_easeout = self.params.curve_control_easeout
+
         self.curve_parent = self.params.curve_parent
-        #self.curve_location = self.params.curve_location
+        self.curve_parent_scale_offset = self.params.curve_parent_scale_offset
+        self.curve_parent_scale_x = self.params.curve_parent_scale_x
+        self.curve_parent_scale_y = self.params.curve_parent_scale_y
+        self.curve_parent_scale_z = self.params.curve_parent_scale_z
+
+        self.curve_location = self.params.curve_location
 
         if self.curve_control:
             self.arma_mch = True
         
         self.curve_bone = None
 
+        if self.curve_control and not (self.curve_position < len(self.bones.org)):
+            self.raise_error("Please specify a valid curve control position.")
 
     ####################################################
     # Utilities
@@ -1050,8 +1183,10 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
         self.curve_bone = curve
         return curve
 
-    @stage.apply_bones
-    def apply_control_curve(self):
+    @stage.parent_bones
+    def parent_control_curve(self):
+        if real_bone(self.obj, self.curve_location):
+            copy_bone_position(self.obj, self.curve_location, self.curve_bone)
         if self.curve_control:
             self.set_bone_parent(self.curve_bone, self.bones.mch.curve)
 
@@ -1059,6 +1194,17 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
     def configure_control_curve(self):
         if self.curve_control:
             self.copy_bone_properties(self.bones.org[self.curve_position], self.curve_bone)
+
+    @stage.rig_bones
+    def offset_scale_control_curve(self):
+        if self.curve_control and real_bone(self.obj, self.curve_parent) and self.curve_parent_scale_offset:
+            self.bone_scale_offset(
+                self.curve_bone,
+                self.curve_parent,
+                self.curve_parent_scale_x,
+                self.curve_parent_scale_y,
+                self.curve_parent_scale_z
+            )
 
     ####################################################
     # Curve MCH
@@ -1150,7 +1296,7 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
         else:
             super().make_bend_mch_chain()
 
-    @stage.parent_bones
+    @stage.apply_bones
     def transform_bend_mch_chain(self):
         if self.curve_control:
             ctrls = self.bones.ctrl.stretch
@@ -1164,7 +1310,7 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
             segments = min(len(self.bones.org) * 3, 32)
             eases = [self.bend_easein, self.curve_control_easein, self.curve_control_easeout, self.bend_easeout]
             for bend, ease_in, ease_out, handle_start, handle_end in zip(self.bones.mch.bend, eases, eases[2:], ctrls, ctrls[1:]):
-                self.ease_bbone(bend, segments, ease_in, ease_out, handle_start, handle_end)
+                self.setup_bbone(bend, segments, ease_in, ease_out, handle_start, handle_end)
         else:
             super().ease_bend_mch_chain()
 
@@ -1184,7 +1330,7 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
         else:
             super().make_stretch_mch_chain()
 
-    @stage.parent_bones
+    @stage.apply_bones
     def transform_stretch_mch_chain(self):
         if self.curve_control:
             ctrls = self.bones.ctrl.stretch
@@ -1238,10 +1384,18 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
                 r.prop(params, 'curve_position')
                 r.prop(params, 'curve_center', text="", icon='SNAP_MIDPOINT')
                 r = box.row(align=True)
-                r.prop(params, 'curve_control_easein', slider=True)
                 r.prop(params, 'curve_control_easeout', slider=True)
-                box.row().prop(params, 'curve_parent')
-                #box.row().prop(params, 'curve_location')
+                r.prop(params, 'curve_control_easein', slider=True)
+                box.row().prop(params, 'curve_location')
+                r = box.row(align=True)
+                r.prop(params, 'curve_parent')
+                if params.curve_parent:
+                    r.prop(params, 'curve_parent_scale_offset', text="", icon='CON_SIZELIKE')
+                    if params.curve_parent_scale_offset:
+                        r = box.row()
+                        r.prop(params, 'curve_parent_scale_x', text="X")
+                        r.prop(params, 'curve_parent_scale_y', text="Y")
+                        r.prop(params, 'curve_parent_scale_z', text="Z")
 
     ####################################################
     # SETTINGS
@@ -1257,18 +1411,16 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
         )
 
         params.curve_parent = bpy.props.StringProperty(
-            name="Curve Parent",
+            name="Parent",
             default="",
             description="Switch parenting to this bone"
         )
 
-        '''
         params.curve_location = bpy.props.StringProperty(
-            name="Curve Location",
+            name="Location",
             default="",
             description="Move curve control to this bone"
         )
-        '''
 
         params.curve_position = bpy.props.IntProperty(
             name="Curve Position",
@@ -1297,6 +1449,33 @@ class CurvyBendyStretchRig(EasingBendyStretchRig):
             soft_min=0.0,
             soft_max=2.0,
             description="B-Bone ease going into curve control"
+        )
+
+        params.curve_parent_scale_offset = bpy.props.BoolProperty(
+            name="Copy Curve Parent Scale",
+            default=False,
+            description="Set scale offset for curve controller"
+        )
+
+        params.curve_parent_scale_x = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="X Source Axis",
+            default='X',
+            description="Source axis for X scale curve offset"
+        )
+
+        params.curve_parent_scale_y = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="Y Source Axis",
+            default='Y',
+            description="Source axis for Y scale curve offset"
+        )
+
+        params.curve_parent_scale_z = bpy.props.EnumProperty(
+            items=self.offset_axes,
+            name="Z Source Axis",
+            default='Z',
+            description="Source axis for Z scale curve offset"
         )
 
     @classmethod
