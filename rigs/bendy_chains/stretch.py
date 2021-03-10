@@ -22,11 +22,22 @@ import bpy
 
 from rigify.utils.layers import ControlLayersOption
 
-from .stretch_bendy_rigs import EasingStretchBendyRig, ComplexStretchBendyRig, HarmonicScaleStretchRig, ParentedStretchBendyRig, ScalingStretchBendyRig, AlignedStretchBendyRig, CurvyStretchBendyRig, StraightStretchBendyRig
+from .stretch_bendy_rigs import ComplexStretchBendyRig, HarmonicScaleStretchRig, \
+StraightStretchBendyRig, ConnectingStretchBendyRig, ParentedStretchBendyRig, \
+ScalingStretchBendyRig, AlignedStretchBendyRig, CurvyStretchBendyRig
 
-class Rig(CurvyStretchBendyRig, HarmonicScaleStretchRig, ScalingStretchBendyRig, AlignedStretchBendyRig, ParentedStretchBendyRig, StraightStretchBendyRig, ComplexStretchBendyRig):
+class Rig(
+    CurvyStretchBendyRig,
+    AlignedStretchBendyRig,
+    ScalingStretchBendyRig,
+    ParentedStretchBendyRig,
+    ConnectingStretchBendyRig,
+    StraightStretchBendyRig,
+    HarmonicScaleStretchRig,
+    ComplexStretchBendyRig
+    ):
     """
-    Most basic stretchy chain
+    All-mighty stretchy bender
     """
 
     ####################################################
@@ -45,6 +56,9 @@ class Rig(CurvyStretchBendyRig, HarmonicScaleStretchRig, ScalingStretchBendyRig,
             self.parent_ui(self, box, params)
             self.scale_ui(self, box, params)
             self.align_ui(self, box, params)
+            box_a = box.box()
+            box_a.label(text="Tweak Attaching Requires At Least 2 Segments", icon='INFO')
+            self.attach_ui(self, box_a, params)
             self.volume_ui(self, box, params)
             self.complex_stretch_ui(self, box, params)
             self.rotation_mode_tweak_ui(self, box, params)

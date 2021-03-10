@@ -20,7 +20,8 @@
 
 import bpy
 
-from rigify.utils.bones import align_bone_roll, align_bone_x_axis, align_bone_y_axis, align_bone_z_axis, get_bone
+from rigify.utils.bones import align_bone_roll, align_bone_x_axis, \
+align_bone_y_axis, align_bone_z_axis, get_bone
 
 
 #=============================================
@@ -50,42 +51,42 @@ def distance(obj, bone_name1, bone_name2, tail=False):
 # Aligning
 #=============================================
 
-def align_bone_to_bone_axis(obj, bone1, bone2, axis='Y', preserve='X'):
+def align_bone_to_bone_axis(obj, bone_name1, bone_name2, axis='Y', preserve='X'):
     '''
     Matches the bone y-axis to specified axis of another bone
     '''
-    bone1_e = obj.data.edit_bones[bone1]
-    bone2_e = obj.data.edit_bones[bone2]
-    length = bone1_e.length
+    bone1 = obj.data.edit_bones[bone_name1]
+    bone2 = obj.data.edit_bones[bone_name2]
+    length = bone1.length
 
     # Get preservation vector
     if preserve == 'X':
-        vec_preserve = bone1_e.x_axis
+        vec_preserve = bone1.x_axis
     elif preserve == 'Z':
-        vec_preserve = bone1_e.z_axis
+        vec_preserve = bone1.z_axis
     
     # Get vector for Y alignment
     if axis.endswith('X'):
-        vec_axis = bone2_e.x_axis
+        vec_axis = bone2.x_axis
     elif axis.endswith('Y'):
-        vec_axis = bone2_e.y_axis
+        vec_axis = bone2.y_axis
     elif axis.endswith('Z'):
-        vec_axis = bone2_e.z_axis
+        vec_axis = bone2.z_axis
     
     if axis.startswith('-'):
         vec_axis.negate()
     
     # Align Y
-    align_bone_y_axis(obj, bone1, vec_axis)
+    align_bone_y_axis(obj, bone_name1, vec_axis)
 
     # Roll to preserved axis
     if preserve == 'X':
-        align_bone_x_axis(obj, bone1, vec_preserve)
+        align_bone_x_axis(obj, bone_name1, vec_preserve)
     elif preserve == 'Z':
-        align_bone_z_axis(obj, bone1, vec_preserve)
+        align_bone_z_axis(obj, bone_name1, vec_preserve)
     
     # Restore length
-    bone1_e.length = length
+    bone1.length = length
 
 def align_bone(obj, bone_name, prev_target, roll_target, next_target, prev_tail=False, next_tail=False):
     '''

@@ -22,9 +22,16 @@ import bpy
 
 from rigify.utils.layers import ControlLayersOption
 
-from .chain_bendy_rigs import AlignedChainBendyRig, SegmentedChainBendyRig, ConnectingChainBendyRig, MasterControlChainBendyRig, ComplexChainBendyRig
+from .chain_bendy_rigs import ComplexChainBendyRig, AlignedChainBendyRig, \
+ConnectingChainBendyRig, SegmentedChainBendyRig, MasterControlChainBendyRig
 
-class Rig(MasterControlChainBendyRig, SegmentedChainBendyRig, ConnectingChainBendyRig, AlignedChainBendyRig, ComplexChainBendyRig):
+class Rig(
+    MasterControlChainBendyRig,
+    SegmentedChainBendyRig,
+    ConnectingChainBendyRig,
+    AlignedChainBendyRig,
+    ComplexChainBendyRig
+    ):
     """
     Bendy tentacle
     """
@@ -34,11 +41,10 @@ class Rig(MasterControlChainBendyRig, SegmentedChainBendyRig, ConnectingChainBen
         box = layout.box()
         self.master_control_ui(self, box, params)
         self.segmented_fk_ui(self, box, params)
-        self.parent_ui(self, box, params)
+        self.attach_ui(self, box, params)
         layout.row().prop(params, 'show_advanced')
         if params.show_advanced:
             box = layout.box()
-            self.tip_ui(self, box, params)
             self.align_ui(self, box, params)
             self.complex_stretch_ui(self, box, params)
             self.rotation_mode_tweak_ui(self, box, params)

@@ -34,10 +34,15 @@ from ...bendy_rigs import HandleBendyRig, ComplexBendyRig, AlignedBendyRig, Conn
 from ...utils.bones import align_bone_to_bone_axis, align_bone, distance, real_bone
 from ...utils.misc import threewise_nozip
 
+
 class ChainBendyRig(HandleBendyRig):
     """
     FK bendy rig
     """
+
+    def initialize(self):
+        super().initialize()
+        self.org_transform = self.params.org_transform_fk
 
     ##############################
     # Control chain
@@ -98,6 +103,22 @@ class ChainBendyRig(HandleBendyRig):
 
         ControlLayersOption.TWEAK.assign(self.params, self.obj, tweaks)
 
+    ##############################
+    # ORG chain
+    
+    @stage.rig_bones
+    def rig_org_chain(self):
+        ctrls = self.bones.ctrl
+        for args in zip(self.bones.org, self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
+            self.rig_org_bone(*args)
+            
+    def rig_org_bone(self, org, deform, tweak, next_tweak, fk):
+        if self.org_transform == 'FK':
+            self.make_constraint(org, 'COPY_TRANSFORMS', fk)
+        else:
+            super().rig_org_bone(org, deform, tweak, next_tweak)
+
+
     ####################################################
     # Deform bones
 
@@ -106,6 +127,29 @@ class ChainBendyRig(HandleBendyRig):
         ctrls = self.bones.ctrl
         for args in zip(self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
             self.rig_deform_bone(*args)
+
+    ####################################################
+    # UI
+    
+    def org_transform_ui(self, layout, params):
+        layout.row().prop(params, 'org_transform_fk', text="ORGs")
+
+    ####################################################
+    # SETTINGS
+
+    @classmethod
+    def add_parameters(self, params):
+        params.org_transform_fk = bpy.props.EnumProperty(
+            name="ORG Transform base",
+            items=(
+                ('FK', "FK Controls", "FK Controls"),
+                ('DEF', "Deforms", "Deforms"),
+                ('TWEAK', "Single Tweak", "Single Tweak"),
+                ('TWEAKS', "Between Tweaks", "BetweenTweaks")
+            ),
+            default='FK',
+            description="Source of ORG transformation; useful to determine children's behaviour"
+        )  
 
     @classmethod
     def parameters_ui(self, layout, params):
@@ -116,18 +160,6 @@ class ChainBendyRig(HandleBendyRig):
 ### Combine from the following:
 
 # Frankensteined classes
-
-class AlignedChainBendyRig(AlignedBendyRig, ChainBendyRig):
-    """
-    Bendy chain rig with start and end Y-alignment
-    """
-
-
-class ConnectingChainBendyRig(ConnectingBendyRig, ChainBendyRig):
-    """
-    Bendy rig that can connect to a (tweak of its) parent, as well as attach its tip to another bone.
-    """
-
 
 class ComplexChainBendyRig(ComplexBendyRig, ChainBendyRig):
     """
@@ -143,6 +175,18 @@ class ComplexChainBendyRig(ComplexBendyRig, ChainBendyRig):
             ctrls = self.bones.ctrl
             for args in zip(count(0), self.bones.mch.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
                 self.rig_deform_mch_bone(*args)
+
+
+class AlignedChainBendyRig(AlignedBendyRig, ChainBendyRig):
+    """
+    Bendy chain rig with start and end Y-alignment
+    """
+
+
+class ConnectingChainBendyRig(ConnectingBendyRig, ChainBendyRig):
+    """
+    Bendy rig that can connect to a (tweak of its) parent, as well as attach its tip to another bone.
+    """
 
 
 # End of Frankensteined classes... following are specific to Bendy Chains; still combinable!
@@ -342,7 +386,7 @@ class MasterControlChainBendyRig(ChainBendyRig):
             ctrls = self.bones.ctrl
             bone = ctrls.master
             create_ballsocket_widget(self.obj, bone, size=0.7)
-            transform = ctrls.fk[-1] if self.tip_bone else ctrls.tweak[-1]
+            transform = ctrls.fk[-1] if self.attribute_return(['tip_bone']) else ctrls.tweak[-1]
             set_bone_widget_transform(self.obj, bone, transform)
 
     
@@ -352,8 +396,9 @@ class MasterControlChainBendyRig(ChainBendyRig):
     @stage.rig_bones
     def rig_copy_rotation(self):
         if self.master_control:
-            if hasattr(self.bones.mch, 'fktarget'):
-                rots = [self.bones.ctrl.fk[0]] + self.bones.mch.fktarget
+            fktarget = self.attribute_return(['bones', 'mch', 'fktarget'])
+            if fktarget:
+                rots = [self.bones.ctrl.fk[0]] + fktarget
             else:
                 rots = self.bones.ctrl.fk
 
@@ -423,10 +468,9 @@ class RotMechChainBendyRig(ChainBendyRig):
 
     def get_parent_parent_mch(self, default_bone):
         """ Return the parent's master control bone if connecting and found. """
-        parents = ('PARENT', 'TWEAK')
-        if hasattr(self, 'parent_start_incoming') and self.parent_start_incoming in parents \
-        and self.rigify_parent and hasattr(self.rigify_parent.bones.ctrl, 'master'):
-            return self.rigify_parent.bones.ctrl.master
+        master = self.attribute_return(['rigify_parent', 'bones', 'ctrl', 'master'])
+        if master and self.attribute_return(['base_type']) in ('PARENT', 'TWEAK'):
+            return master
         else:
             return default_bone
 
@@ -494,28 +538,3 @@ class RotMechChainBendyRig(ChainBendyRig):
 
         if copy_scale:
             self.make_constraint(mch, 'COPY_SCALE', self.follow_bone)
-
-'''
-class ParentSwitchChainBendyRig(ChainBendyRig):
-    """
-    WIP
-
-    Connecting Bendy switchable parenting.
-    """
-
-    ####################################################
-    # Parent MCH
-
-    @stage.generate_bones
-    def make_parent_mch(self):
-        base = self.base_bone
-        self.bones.mch.parent = self.copy_bone(base, make_derived_name(strip_org(base), 'mch', '.parent'))
-
-        # Check if self is a RotMechChainBendyRig and only set root if that's the case
-        if not hasattr(self, 'rotation_bones'):
-            self.root_bone = self.bones.mch.parent
-
-    @stage.parent_bones
-    def parent_parent_mch(self):
-        self.set_bone_parent(self.bones.mch.parent, self.rig_parent_bone)
-'''

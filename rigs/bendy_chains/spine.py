@@ -20,14 +20,8 @@
 
 import bpy
 
-from itertools import count
-
-from rigify.utils.bones import put_bone
 from rigify.utils.layers import ControlLayersOption
-from rigify.utils.naming import make_derived_name
-from rigify.utils.misc import map_list
 from rigify.base_rig import stage
-from rigify.rigs.widgets import create_gear_widget
 
 from rigify.rigs.spines.basic_spine import Rig as SpineRig
 
@@ -45,7 +39,8 @@ class Rig(SpineRig, ChainBendyRig):
         super().initialize()
         ChainBendyRig.initialize(self)
         self.rotation_mode_end = self.params.rotation_mode_end
-        
+        self.org_transform = 'FK'
+
     ####################################################
     # Master control bone
 
@@ -144,26 +139,13 @@ class Rig(SpineRig, ChainBendyRig):
 
     @classmethod
     def add_parameters(self, params):
-        # Added rotation mode
-
         super().add_parameters(params)
 
-        rotation_modes = (
-            ('QUATERNION', 'Quaternion (WXYZ)', 'Quaternion (WXYZ)'),
-            ('XYZ', 'XYZ', 'XYZ'),
-            ('XZY', 'XZY', 'XZY'), 
-            ('YXZ', 'YXZ', 'YXZ'),
-            ('YZX', 'YZX', 'YZX'),
-            ('ZXY', 'ZXY', 'ZXY'),
-            ('ZYX', 'ZYX', 'ZYX'),
-            ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
-        )
-
         params.rotation_mode_end = bpy.props.EnumProperty(
-            name        = 'Default Chest & Hip Rotation Mode',
-            items       = rotation_modes,
-            default     = 'QUATERNION',
-            description = 'Default rotation mode for chest and hip control bones'
+            name='Default Chest & Hip Rotation Mode',
+            items=self.rotation_modes,
+            default='QUATERNION',
+            description='Default rotation mode for chest and hip control bones'
         )
     
     @classmethod

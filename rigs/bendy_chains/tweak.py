@@ -34,7 +34,7 @@ class Rig(ConnectingBendyRig, AlignedBendyRig, ComplexBendyRig):
         layout.row().prop(params, 'show_advanced')
         if params.show_advanced:
             box = layout.box()
-            self.parent_ui(self, box, params)
+            self.attach_ui(self, box, params)
             self.tip_ui(self, box, params)
             self.align_ui(self, box, params)
             self.complex_stretch_ui(self, box, params)
@@ -43,4 +43,3 @@ class Rig(ConnectingBendyRig, AlignedBendyRig, ComplexBendyRig):
             self.volume_ui(self, box, params)
         box = layout.box()
         self.bbones_ui(self, box, params)
-        #ControlLayersOption.TWEAK.parameters_ui(layout, params)
