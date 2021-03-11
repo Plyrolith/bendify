@@ -373,6 +373,8 @@ class BENDIFY_OT_WidgetsEditStart(bpy.types.Operator):
     bl_label = "Start Editing Widgets"
     bl_options = {'REGISTER', 'UNDO'}
 
+    snap_cursor: bpy.props.BoolProperty(name="Snap Cursor to Active", default=True)
+
     @classmethod
     def poll(cls, context):
         return context.active_object \
@@ -381,6 +383,15 @@ class BENDIFY_OT_WidgetsEditStart(bpy.types.Operator):
         and context.active_pose_bone \
         and context.selected_pose_bones \
         and not hasattr(context.scene, 'edit_widgets')
+
+    def cursor_to_active(self, context):
+        act = context.active_object
+        c = context.scene.cursor
+        c.location = act.location
+        c.rotation_mode = act.rotation_mode
+        c.rotation_axis_angle = act.rotation_axis_angle
+        c.rotation_euler = act.rotation_euler
+        c.rotation_quaternion = act.rotation_quaternion
 
     def execute(self, context):
         col_name = "Widgets_edit"
@@ -423,6 +434,10 @@ class BENDIFY_OT_WidgetsEditStart(bpy.types.Operator):
                 context.view_layer.objects.active = widget_active
             else:
                 context.view_layer.objects.active = widgets[-1]
+
+            # Snap cursor
+            if self.snap_cursor:
+                self.cursor_to_active(context)
             
             # Set scene property and switch to edit mode
             s['edit_widgets'] = armas
