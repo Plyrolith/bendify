@@ -571,6 +571,7 @@ class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
         name="Blend",
         default='ADD'
     )
+    notify: bpy.props.BoolProperty(name="Report Type", default=True)
 
     @classmethod
     def poll(cls, context):
@@ -609,4 +610,6 @@ class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
 
         paint.brush = brush
         bpy.ops.wm.tool_set_by_id(name="builtin_brush.Draw")
+        if self.notify:
+            self.report({'INFO'}, brush.name + " set to " + self.blend)
         return {"FINISHED"}
