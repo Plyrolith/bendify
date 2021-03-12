@@ -29,6 +29,7 @@ classes = (
     BENDIFY_OT_ObjectNamesNormalize,
     BENDIFY_OT_MaterialSlotsSwitch,
     BENDIFY_OT_MirrorAllWeights,
+    BENDIFY_OT_RigifyCopyToSelected,
     BENDIFY_OT_WidgetsSelect,
     BENDIFY_OT_WidgetsTransform,
     BENDIFY_OT_WidgetsEditStart,

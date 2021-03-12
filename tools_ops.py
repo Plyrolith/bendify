@@ -3,6 +3,31 @@ import re
 import unicodedata
 
 
+class BENDIFY_OT_RigifyCopyToSelected(bpy.types.Operator):
+    """Copy Rigify properties to from active to selected pose bones"""
+    bl_idname = 'pose.rigify_copy_to_selected'
+    bl_label = "Copy to Selected"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    @classmethod
+    def poll(cls, context):
+        if context.mode == 'POSE':
+            try:
+                return context.active_pose_bone.rigify_type
+            except AttributeError:
+                return None
+
+    def execute(self, context):
+        act = context.active_pose_bone
+        for pb in context.selected_pose_bones:
+            if not pb.bone.use_connect and not pb == act:
+                pb.rigify_type = act.rigify_type
+                for k in act.rigify_parameters.keys():
+                    if hasattr(pb.rigify_parameters, k):
+                        setattr(pb.rigify_parameters, k, getattr(act.rigify_parameters, k))
+        return {"FINISHED"}
+
+
 class BENDIFY_OT_StretchToReset(bpy.types.Operator):
     """Reset Stretch To constraint length for bones"""
     bl_idname = 'pose.stretchto_reset'
