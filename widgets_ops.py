@@ -207,6 +207,13 @@ widgets_dict = {
         "function": create_square_widget,
         "kwargs": ["size"],
     },
+    'PIN':
+        {
+        "name": "Pin",
+        "icon": 'UNPINNED',
+        "function": create_pin_widget,
+        "kwargs": ["size", "axis_size", "cap_size", "square", "invert"],
+    },
 }
 
 class WidgetNamesMixin():
