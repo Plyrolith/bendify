@@ -2,6 +2,7 @@ import bpy
 import re
 import unicodedata
 
+from .utils.misc import attribute_return
 
 class BENDIFY_OT_RigifyCopyToSelected(bpy.types.Operator):
     """Copy Rigify properties to from active to selected pose bones"""
@@ -25,6 +26,94 @@ class BENDIFY_OT_RigifyCopyToSelected(bpy.types.Operator):
                 for k in act.rigify_parameters.keys():
                     if hasattr(pb.rigify_parameters, k):
                         setattr(pb.rigify_parameters, k, getattr(act.rigify_parameters, k))
+        return {"FINISHED"}
+
+
+class BENDIFY_OT_ForceDriversUpdate(bpy.types.Operator):
+    """Force Drivers of specified datablocks to update"""
+    bl_idname = 'object.force_drivers_update'
+    bl_label = "Force Drivers Update"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    use_objects: bpy.props.BoolProperty(name="Objects", default=True)
+    use_meshes: bpy.props.BoolProperty(name="Meshes", default=True)
+    use_curves: bpy.props.BoolProperty(name="Curves", default=True)
+    use_volumes: bpy.props.BoolProperty(name="Volumes", default=True)
+    use_metaballs: bpy.props.BoolProperty(name="Metaballs", default=True)
+    use_lattices: bpy.props.BoolProperty(name="Lattices", default=True)
+    use_armatures: bpy.props.BoolProperty(name="Armatures", default=True)
+    use_cameras: bpy.props.BoolProperty(name="Cameras", default=True)
+    use_lights: bpy.props.BoolProperty(name="Lights", default=True)
+    use_lightprobes: bpy.props.BoolProperty(name="Light Probes", default=True)
+    use_grease_pencils: bpy.props.BoolProperty(name="Grease Pencils", default=True)
+    use_actions: bpy.props.BoolProperty(name="Actions", default=True)
+    use_materials: bpy.props.BoolProperty(name="Materials", default=True)
+    use_node_groups: bpy.props.BoolProperty(name="Node Groups", default=True)
+    use_particles: bpy.props.BoolProperty(name="Particles", default=True)
+    use_cache_files: bpy.props.BoolProperty(name="Cache Files", default=True)
+    use_scenes: bpy.props.BoolProperty(name="Scenes", default=True)
+    use_images: bpy.props.BoolProperty(name="Images", default=True)
+    use_movieclips: bpy.props.BoolProperty(name="Movie Clips", default=True)
+    use_speakers: bpy.props.BoolProperty(name="Speakers", default=True)
+
+    def force_update(self, datablocks):
+        count = 0
+        for db in datablocks:
+            for d in attribute_return(db, ['animation_data', 'drivers'], True):
+                d.driver.expression += " "
+                d.driver.expression = d.driver.expression[:-1]
+                count += 1
+        return count
+
+    def execute(self, context):
+        D = bpy.data
+        dbs = []
+        if self.use_objects:
+            dbs.extend(D.objects)
+        if self.use_meshes:
+            dbs.extend(D.meshes)
+        if self.use_curves:
+            dbs.extend(D.curves)
+        if self.use_volumes:
+            dbs.extend(D.volumes)
+        if self.use_metaballs:
+            dbs.extend(D.metaballs)
+        if self.use_lattices:
+            dbs.extend(D.lattices)
+        if self.use_armatures:
+            dbs.extend(D.armatures)
+        if self.use_cameras:
+            dbs.extend(D.cameras)
+        if self.use_lights:
+            dbs.extend(D.lights)
+        if self.use_lightprobes:
+            dbs.extend(D.lightprobes)
+        if self.use_grease_pencils:
+            dbs.extend(D.grease_pencils)
+        if self.use_actions:
+            dbs.extend(D.actions)
+        if self.use_materials:
+            dbs.extend(D.materials)
+            for m in D.materials:
+                if hasattr(m, 'node_tree'):
+                    dbs.append(m.node_tree)
+        if self.use_node_groups:
+            dbs.extend(D.node_groups)
+        if self.use_particles:
+            dbs.extend(D.particles)
+        if self.use_cache_files:
+            dbs.extend(D.cache_files)
+        if self.use_scenes:
+            dbs.extend(D.scenes)
+        if self.use_images:
+            dbs.extend(D.images)
+        if self.use_movieclips:
+            dbs.extend(D.movieclips)
+        if self.use_speakers:
+            dbs.extend(D.speakers)
+        
+        count = self.force_update(dbs)
+        self.report({'INFO'}, str(count) + " Drivers found and refreshed.")
         return {"FINISHED"}
 
 

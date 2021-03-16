@@ -54,3 +54,4 @@ class BENDIFY_PT_RigifyButtons(bpy.types.Panel):
     
     def draw(self, context):
         DATA_PT_rigify_buttons.draw(self, context)
+        self.layout.operator('object.force_drivers_update', icon='DRIVER')
