@@ -6,7 +6,9 @@ from rigify.utils.widgets_basic import *
 from rigify.utils.widgets_special import *
 from rigify.rigs.widgets import *
 
+from .utils.misc import attribute_return
 from .utils.widgets_bendy import *
+
 
 widgets_dict = {
     'KEEP':
@@ -216,10 +218,16 @@ widgets_dict = {
     },
 }
 
+
+#=============================================
+# Mixin Classes
+#=============================================
+
 class WidgetNamesMixin():
     """Collect all widgets with their armature object and pose bone names"""
 
-    def collect_widgets(self):
+    @staticmethod
+    def collect_widgets():
         D = bpy.data
         widgets = {}
         for obj in D.objects:
@@ -236,7 +244,8 @@ class WidgetNamesMixin():
 class WidgetEditMixin():
     """Mixin class for temporary cursor, orientation and pivot settings"""
     
-    def cursor(self, context, matrix=None, compare=None):
+    @staticmethod
+    def cursor(context, matrix=None, compare=None):
         c = context.scene.cursor
         matrix_old = c.matrix
         matrix_new = Matrix(compare) if compare else None
@@ -244,7 +253,8 @@ class WidgetEditMixin():
             c.matrix = matrix
         return [matrix_old, c.matrix]
 
-    def orientation(self, context, orientation=None):
+    @staticmethod
+    def orientation(context, orientation=None):
         s = context.scene.transform_orientation_slots[0]
         orient_old = s.type
         if not orientation:
@@ -253,7 +263,8 @@ class WidgetEditMixin():
             s.type = orientation
         return orient_old
 
-    def pivot(self, context, pivot=None):
+    @staticmethod
+    def pivot(context, pivot=None):
         t = context.scene.tool_settings
         pivot_old = t.transform_pivot_point
         if not pivot:
@@ -262,6 +273,55 @@ class WidgetEditMixin():
             t.transform_pivot_point = pivot
         return pivot_old
 
+
+class WidgetObjectsMixin():
+    """Mixin class for collecting widget objects"""
+
+    @staticmethod
+    def widgets_from_pose_bones(pose_bones):
+        """Collect widget objects from pose bones and correct their transforms
+        """
+        widgets = []
+        for pbone in pose_bones:
+            widget = pbone.custom_shape
+            if widget and not widget in widgets:
+                obj_to_bone(widget, pbone.id_data, pbone.name)
+                widgets.append(widget)
+        return widgets
+    
+    @staticmethod
+    def widgets_temp_collection_add(widgets, col_name="Widgets_edit"):
+        """Build temporary widget collection and select widgets
+        """
+        D = bpy.data
+        col = None
+        if widgets:
+            if col_name in D.collections:
+                D.collections.remove(D.collections[col_name])
+            col = D.collections.new(col_name)
+            bpy.context.collection.children.link(col)
+            col.hide_select = False
+            col.hide_viewport = False
+            col.hide_render = True
+
+            for widget in widgets:
+                col.objects.link(widget)
+                widget.hide_select = False
+                widget.hide_viewport = False
+                widget.hide_set(False)
+                widget.select_set(True)    
+        return col
+
+    @staticmethod
+    def widgets_temp_collection_remove(col_name="Widgets_edit"):
+        """Build temporary widget collection and select widgets
+        """
+        if col_name in bpy.data.collections:
+            bpy.data.collections.remove(bpy.data.collections[col_name])
+
+#=============================================
+# Operators
+#=============================================
 
 class BENDIFY_OT_WidgetsSelect(bpy.types.Operator):
     """Select new widgets for selected bones"""
@@ -348,17 +408,21 @@ class BENDIFY_OT_WidgetsSelect(bpy.types.Operator):
 
     def invoke(self, context, event):
         self.widget = 'KEEP'
-        #self.radius = 1.0
-        #self.size = 1.0
         return context.window_manager.invoke_props_popup(self, event)
 
 
-class BENDIFY_OT_WidgetsTransform(bpy.types.Operator):
-    """Transform selected widgets in local space"""
-    bl_idname = "pose.widgets_transform"
-    bl_label = "Transform Widgets"
+class BENDIFY_OT_WidgetsBevel(bpy.types.Operator, WidgetObjectsMixin):
+    """Convert selected widgets to curves and set bevel"""
+    bl_idname = "pose.widgets_bevel"
+    bl_label = "Bevel Widgets"
     bl_options = {'REGISTER', 'UNDO'}
 
+    delta: bpy.props.FloatProperty(name="Delta", default=0.0)
+    bevel_resolution: bpy.props.IntProperty(name="Resolution", default=2)
+    use_fill_caps: bpy.props.BoolProperty(name="Fill Caps", default=True)
+    use_smooth: bpy.props.BoolProperty(name="Smooth Curves", default=True)
+
+    '''
     mode: bpy.props.EnumProperty(
         name="Transform Mode",
         items=[
@@ -368,43 +432,124 @@ class BENDIFY_OT_WidgetsTransform(bpy.types.Operator):
         ],
         default='SCALE'
     )
+    '''
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'POSE' and context.selected_pose_bones
 
-    #def execute(self, context):
-    #    print(str(self.x) + " " + str(self.y))
-    #    return {'FINISHED'}
+    def execute(self, context):
+        self.prepare_widgets(context)
+        self.bevel()
+        self.viewport_settings()
+        self.viewport_fix_remove(self.widgets)
+        self.widgets_temp_collection_remove(col_name="Widgets_bevel")
+        return {'FINISHED'}
 
     def modal(self, context, event):
         if event.type == 'MOUSEMOVE':
-            print(f"MOUSEMOVE at {event.mouse_x}, {event.mouse_y}")
-            #self.x = event.mouse_x
-            #self.y = event.mouse_y
-            #self.execute(context)
+            self.delta = (event.mouse_x - self.x_init) / self.precision
+            self.bevel()
+            
+        elif event.type == 'LEFT_SHIFT':
+            if event.value == 'PRESS':
+                self.precision = 10000
+            if event.value == 'RELEASE':
+                self.precision = 1000
+            self.bevel()
         
         elif event.type == 'LEFTMOUSE':
-            print(f"LEFT CLICK at {event.mouse_x}, {event.mouse_y}")
-            #return {'FINISHED'}
+            self.execute(context)
+            context.window.cursor_modal_restore()
+            return {'FINISHED'}
         
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
-            print(f"STOP")
+            for k, v in self.widgets.items():
+                bpy.data.objects[k].data.bevel_depth = v['depth']
+            self.viewport_fix_remove(self.widgets)
+            self.widgets_temp_collection_remove(col_name="Widgets_bevel")
+            context.window.cursor_modal_restore()
             return {'CANCELLED'}
         
         return {'RUNNING_MODAL'}
         
     def invoke(self, context, event):
-        #self.init_loc_x = context.object.location.x
-        #self.x = event.mouse_x
-        #self.y = event.mouse_y
-        #self.execute(context)
+        # Convert widgets to curves
+        widgets_obj = self.prepare_widgets(context)
 
+        # Store initial bevel depth and mouse position, set viewport fix
+        self.widgets = {}
+        for w in widgets_obj:
+            self.viewport_fix_add(w)
+            self.widgets[w.name] = {'depth': w.data.bevel_depth, 'scale': w.scale}
+
+        # Initial viewport settings
+        self.viewport_settings()
+
+        # Setup modal values
+        self.x_init = event.mouse_x
+        self.delta = 0
+        self.precision = 1000
+        
+        # Modal
+        context.window.cursor_modal_set('SCROLL_X')
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
+    def bevel(self):
+        for k, v in self.widgets.items():
+            scale_avg = max((v['scale'][0] + v['scale'][1] + v['scale'][2]) / 3, 0.0001)
+            bpy.data.objects[k].data.bevel_depth = abs(
+                v['depth'] + self.delta / scale_avg
+            )
 
-class BENDIFY_OT_WidgetsEditStart(bpy.types.Operator, WidgetEditMixin):
+    def viewport_settings(self):
+        for widget in self.widgets:
+            w = bpy.data.objects[widget]
+            w.data.bevel_resolution = self.bevel_resolution
+            w.data.use_fill_caps = self.use_fill_caps
+            for spline in w.data.splines:
+                spline.use_smooth = self.use_smooth
+
+    def prepare_widgets(self, context):
+        # Collect widgets
+        widgets_obj = self.widgets_from_pose_bones(context.selected_pose_bones)
+        self.widgets_temp_collection_add(widgets_obj, col_name="Widgets_bevel")
+
+        # Convert to curves
+        widgets_mesh = [w for w in widgets_obj if not w.type == 'CURVE']
+        if widgets_mesh:
+            act = context.active_object
+            c = context.copy()
+            c['mode'] = 'OBJECT'
+            c['active_object'] = widgets_mesh[0]
+            c['selected_objects'] = widgets_mesh
+            bpy.ops.object.convert(c, target='CURVE')
+            context.view_layer.objects.active = act
+        
+        return widgets_obj
+
+    @staticmethod
+    def viewport_fix_add(obj):
+        # Add triangulate modifiers to fix zero bevel invisibility
+        if not any(m.name == "Viewport Fix" for m in obj.modifiers):
+            tri = obj.modifiers.new(name="Viewport Fix", type='TRIANGULATE')
+            tri.quad_method = 'FIXED'
+            tri.ngon_method = 'CLIP'
+            tri.min_vertices = 128
+
+    @staticmethod
+    def viewport_fix_remove(widgets):
+        # Remove triangulate modifiers if bevel > 0
+        for widget in widgets:
+            w = bpy.data.objects[widget]
+            if w.data.bevel_depth > 0:
+                for mod in w.modifiers:
+                    if mod.name == "Viewport Fix":
+                        w.modifiers.remove(mod)
+
+
+class BENDIFY_OT_WidgetsEditStart(bpy.types.Operator, WidgetEditMixin, WidgetObjectsMixin):
     """Enter edit mode for selected bones' widgets"""
     bl_idname = "pose.widgets_edit_start"
     bl_label = "Start Editing Widgets"
@@ -420,60 +565,41 @@ class BENDIFY_OT_WidgetsEditStart(bpy.types.Operator, WidgetEditMixin):
         and not hasattr(context.scene, 'edit_widgets')
 
     def execute(self, context):
-        col_name = "Widgets_edit"
         armas = [context.active_object]
         armas.extend([obj for obj in context.selected_objects if obj.type == 'ARMATURE' and obj not in armas])
         s = context.scene
         D = bpy.data
 
-        # Collect widget objects and correct their transforms
-        widgets = []
-        widget_active = None
-        for pbone in context.selected_pose_bones + [context.active_pose_bone]:
-            widget = pbone.custom_shape
-            if widget and not widget in widgets:
-                obj_to_bone(widget, pbone.id_data, pbone.name)
-                widgets.append(widget)
-        if context.active_pose_bone.custom_shape:
-            widget_active = context.active_pose_bone.custom_shape
+        widgets = self.widgets_from_pose_bones(
+            context.selected_pose_bones + [context.active_pose_bone]
+        )
         
-        # Build collection and select
-        if widgets:
-            bpy.ops.object.mode_set(mode='OBJECT')
-            bpy.ops.object.select_all(action='DESELECT')
-            if col_name in D.collections:
-                D.collections.remove(D.collections[col_name])
-            col = D.collections.new(col_name)
-            s.collection.children.link(col)
-            col.hide_select = False
-            col.hide_viewport = False
-            col.hide_render = True
-
-            for widget in widgets:
-                col.objects.link(widget)
-                widget.hide_select = False
-                widget.hide_viewport = False
-                widget.hide_set(False)
-                widget.select_set(True)
+        # Save active pose bone widget...
+        widget_active = attribute_return(context, ['active_pose_bone', 'custom_shape'])
+        
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        self.widgets_temp_collection_add(widgets)
             
-            if not widget_active:
-                widget_active = widgets[-1]
-            context.view_layer.objects.active = widget_active
-            
-            # Set temporary cursor, orientation and pivot; add scene property
-            s['edit_widgets'] = {
-                "armatures": armas,
-                "cursor": self.cursor(context, widget_active.matrix_world),
-                "orientation": self.orientation(context),
-                "pivot": self.pivot(context),
-            }
+        # ... or set it to the first selected
+        if not widget_active:
+            widget_active = widgets[-1]
+        context.view_layer.objects.active = widget_active
+        
+        # Set temporary cursor, orientation and pivot; add scene property
+        s['edit_widgets'] = {
+            "armatures": armas,
+            "cursor": self.cursor(context, widget_active.matrix_world),
+            "orientation": self.orientation(context),
+            "pivot": self.pivot(context),
+        }
 
-            # Switch to edit mode
-            bpy.ops.object.mode_set(mode='EDIT')
+        # Switch to edit mode
+        bpy.ops.object.mode_set(mode='EDIT')
         return {'FINISHED'}
 
 
-class BENDIFY_OT_WidgetsEditStop(bpy.types.Operator, WidgetEditMixin):
+class BENDIFY_OT_WidgetsEditStop(bpy.types.Operator, WidgetEditMixin, WidgetObjectsMixin):
     """Exit widget edit mode and clean up"""
     bl_idname = "scene.widgets_edit_stop"
     bl_label = "Stop Editing Widgets"
@@ -492,7 +618,7 @@ class BENDIFY_OT_WidgetsEditStop(bpy.types.Operator, WidgetEditMixin):
         if col_name in D.collections:
             col = D.collections[col_name]
             if col_name in s.collection.children \
-            and context.mode == 'EDIT_MESH' or context.mode == 'OBJECT' \
+            and context.mode == 'EDIT_MESH' or context.mode == 'EDIT_CURVE' or context.mode == 'OBJECT' \
             and context.active_object.name in col.objects \
             and s['edit_widgets'] \
             and any(arma for arma in s['edit_widgets']["armatures"] if arma.name in s.objects):
@@ -514,8 +640,8 @@ class BENDIFY_OT_WidgetsEditStop(bpy.types.Operator, WidgetEditMixin):
                 self.orientation(context, s['edit_widgets']["orientation"])
                 self.pivot(context, s['edit_widgets']["pivot"])
     
-            # Remove Widget_edit collection
-            D.collections.remove(col)
+        # Remove Widget_edit collection
+        self.widgets_temp_collection_remove()
         
         # Remove temporary scene property
         del s['edit_widgets']

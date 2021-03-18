@@ -32,7 +32,7 @@ classes = (
     BENDIFY_OT_MirrorAllWeights,
     BENDIFY_OT_RigifyCopyToSelected,
     BENDIFY_OT_WidgetsSelect,
-    BENDIFY_OT_WidgetsTransform,
+    BENDIFY_OT_WidgetsBevel,
     BENDIFY_OT_WidgetsEditStart,
     BENDIFY_OT_WidgetsEditStop,
     BENDIFY_OT_WidgetsNamesFix,

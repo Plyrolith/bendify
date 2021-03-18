@@ -13,6 +13,7 @@ class BendifyWidgetsPanel():
 
         if context.mode == 'POSE':
             col.row().operator('pose.widgets_select', icon='VIEW_PAN')
+            col.row().operator('pose.widgets_bevel', icon='MOD_BEVEL')
             #transform = col.row().operator('pose.widgets_transform', icon='OBJECT_ORIGIN')
         row = col.row()
         if hasattr(context.scene, '["edit_widgets"]'):
