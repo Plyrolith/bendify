@@ -376,7 +376,8 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
             'SURFACE': "SFC",
             'FONT': "TXT",
             'WIDGET': "WGT",
-            'VISIBILITY': "VIS"
+            'VISIBILITY': "VIS",
+            'VOLUME': 'VOL'
         }
 
     @classmethod
