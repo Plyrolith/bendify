@@ -360,6 +360,25 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
     multi: bpy.props.BoolProperty(name="Multi Guess", default=True)
     widgets: bpy.props.BoolProperty(name="Widgets", default=False)
 
+    prefixes = {
+            'ARMATURE': "RIG",
+            'METARIG': "META",
+            'CURVE': "CRV",
+            'CAMERA': "CAM",
+            'EMPTY': "MTY",
+            'MESH': "GEO",
+            'GPENCIL': "GPL",
+            'LATTICE': "LTC",
+            'META': "MBL",
+            'LIGHT': "LGT",
+            'LIGHT_PROBE': "LPR",
+            'SPEAKER': "SPK",
+            'SURFACE': "SFC",
+            'FONT': "TXT",
+            'WIDGET': "WGT",
+            'VISIBILITY': "VIS"
+        }
+
     @classmethod
     def poll(cls, context):
         return bpy.data.objects
@@ -394,103 +413,83 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
                 row.label(text=v, icon='DISCLOSURE_TRI_RIGHT')
                 #row.label(text=k.name + " > " + v, icon=icon)
 
-    def object_names_normalize(self, context):
-        """Renames objects in to match the optimal pattern.
-        Returns: Tuple of object/data dictionaries with datablock keys and name values
-        """
-        
-        def prefixes():
-            return {
-                'ARMATURE': "RIG",
-                'CURVE': "CRV",
-                'CAMERA': "CAM",
-                'EMPTY': "MTY",
-                'MESH': "GEO",
-                'GPENCIL': "GPL",
-                'LATTICE': "LAT",
-                'META': "MBL",
-                'LIGHT': "LGT",
-                'LIGHT_PROBE': "LPR",
-                'SPEAKER': "SPK",
-                'SURFACE': "SFC",
-                'FONT': "TXT",
-                'WIDGET': "WGT",
-                'VISIBILITY': "VIS"
-            }
-
-        def object_type_prefix(obj_type):
-            """Selects standard naming convention prefixes for input object type (string)
-            Returns: String
-            """
-            if obj_type in prefixes():
-                return prefixes()[obj_type]
-            else:
-                return "OBJ"
-
-        def string_clean(string, lower=True, dot=False):
-            """Cleans a string, replacing all special characters with underscores.
-            Also attempts to replace local special characters with simplified standard ones
-            and removes double underscores.
-            Returns: String.
-            """
-            tmp_string = ""
-            for char in string.replace("ß","ss"):
-                desc = unicodedata.name(char)
-                cutoff = desc.find(' WITH ')
-                if cutoff != -1:
-                    desc = desc[:cutoff]
-                    try:
-                        char = unicodedata.lookup(desc)
-                    except KeyError:
-                        pass  # removing "WITH ..." produced an invalid name
-                tmp_string += char
-            if dot:
-                allowed = '[^A-Za-z0-9.]+'
-            else:
-                allowed = '[^A-Za-z0-9]+'
-            tmp_string = re.sub(allowed, '_', tmp_string).lstrip("_").rstrip("_")
-
-            # Lowercase
-            if lower:
-                low_string = ""
-                mutable = len(tmp_string) * [True]
-                for p in list(prefixes().values()):
-                    if p in tmp_string:
-                        start = tmp_string.index(p)
-                        end = start + len(p)
-                        for p_i in range(start, end):
-                            mutable[p_i] = False
-                for i, m in enumerate(mutable):
-                    low_string += tmp_string[i].lower() if m else tmp_string[i]
-                tmp_string = low_string
-            
-            return re.sub('\_\_+', '*', tmp_string)
-
-        def suffix_caps(name):
-            '''Check for dot-one-letter segments and capitalize them'''
-            segs = name.split(".")
-            for seg in segs:
-                if len(seg) == 1:
-                    segs[segs.index(seg)] = seg.upper()
-            return ".".join(segs)
-
-        def rename(prefix, name, lower=True, widgets=False, widgets_skip=True):
-            dash_segs = name.split("-")
-            if dash_segs[0] in list(prefixes().values()):
-                prefix = dash_segs[0]
-                if widgets_skip and (prefix == "WGT"):
-                    new_name = "-".join(dash_segs[1:])
-                else:
-                    new_name = suffix_caps(string_clean("-".join(dash_segs[1:]), lower, dot=True))
-            else:
-                new_name = suffix_caps(string_clean("-".join(dash_segs), lower, dot=True))
-            if widgets:
-                prefix = prefix.replace("GEO", "WGT")
-            return "-".join([prefix, new_name])
-
-        objects = [obj for obj in context.selected_objects if not obj.override_library and not obj.library] \
+    def objects_get(self, context):
+        return [obj for obj in context.selected_objects if not obj.override_library and not obj.library] \
         if self.selected \
         else [obj for obj in bpy.data.objects if not obj.override_library and not obj.library]
+
+    def string_clean(self, string, lower=True, dot=False):
+        """Cleans a string, replacing all special characters with underscores.
+        Also attempts to replace local special characters with simplified standard ones
+        and removes double underscores.
+        Returns: String.
+        """
+        tmp_string = ""
+        for char in string.replace("ß","ss"):
+            desc = unicodedata.name(char)
+            cutoff = desc.find(' WITH ')
+            if cutoff != -1:
+                desc = desc[:cutoff]
+                try:
+                    char = unicodedata.lookup(desc)
+                except KeyError:
+                    pass  # removing "WITH ..." produced an invalid name
+            tmp_string += char
+        if dot:
+            allowed = '[^A-Za-z0-9.]+'
+        else:
+            allowed = '[^A-Za-z0-9]+'
+        tmp_string = re.sub(allowed, '_', tmp_string).lstrip("_").rstrip("_")
+
+        # Lowercase
+        if lower:
+            low_string = ""
+            mutable = len(tmp_string) * [True]
+            for p in list(self.prefixes.values()):
+                if p in tmp_string:
+                    start = tmp_string.index(p)
+                    end = start + len(p)
+                    for p_i in range(start, end):
+                        mutable[p_i] = False
+            for i, m in enumerate(mutable):
+                low_string += tmp_string[i].lower() if m else tmp_string[i]
+            tmp_string = low_string
+        
+        return re.sub('\_\_+', '*', tmp_string)
+
+    @staticmethod
+    def suffix_caps(name):
+        '''Check for dot-one-letter segments and capitalize them'''
+        segs = name.split(".")
+        for seg in segs:
+            if len(seg) == 1:
+                segs[segs.index(seg)] = seg.upper()
+        return ".".join(segs)
+
+    def rename(self, name, obj_type, lower=True, widgets=False, widgets_skip=True):
+        dash_segs = name.split("-")
+        if dash_segs[0] in list(self.prefixes.values()):
+            prefix = dash_segs[0]
+            if widgets_skip and (prefix == "WGT"):
+                new_name = "-".join(dash_segs[1:])
+            else:
+                new_name = self.suffix_caps(self.string_clean("-".join(dash_segs[1:]), lower, dot=True))
+        else:
+            if obj_type in self.prefixes:
+                prefix = self.prefixes[obj_type]
+            else:
+                prefix = "OBJ"
+            new_name = self.suffix_caps(self.string_clean("-".join(dash_segs), lower, dot=True))
+        if widgets:
+            prefix = prefix.replace("GEO", "WGT")
+        return "-".join([prefix, new_name])
+
+    def object_names_normalize(self, context):
+        """Renames objects to match the optimal pattern.
+        Returns: Tuple of object/data dictionaries with datablock keys and name values
+        """
+
+        objects = self.objects_get(context)
 
         # Dict for return
         obj_names = {}
@@ -503,8 +502,7 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
         # Object renaming
         for obj in objects:
             if obj.name not in blocklist:
-                prefix = object_type_prefix(obj.type)
-                obj_name_new = rename(prefix, obj.name, self.lower, self.widgets)
+                obj_name_new = self.rename(obj.name, obj.type, self.lower, self.widgets)
 
                 if not obj_name_new == obj.name:
                     obj_names[obj] = obj_name_new
@@ -518,9 +516,9 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
                     if obj.data.users > 1:
                         # Check if last segment is numeric
                         dot_segs = obj_name_new.split(".") if self.multi else obj.data.name.split(".")
-                        data_name_new = rename(
-                            prefix,
+                        data_name_new = self.rename(
                             dot_segs[0],#".".join(dot_segs[:-1]) if dot_segs[-1].isnumeric() else ".".join(dot_segs),
+                            obj.type,
                             self.lower,
                             self.widgets
                         )

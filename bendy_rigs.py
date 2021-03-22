@@ -556,8 +556,10 @@ class BendyRig(BaseRig, BendyBoneMixin):
     
     @stage.finalize
     def finalize_armature_display(self):
-        '''New function to set rig viewport display'''
+        '''New function to set rig viewport display and protect layers'''
         self.obj.data.display_type = 'BBONE'
+        for i in (29, 30, 31):
+            self.obj.data.layers_protected[i] = True
     
     @classmethod
     def add_parameters(self, params):

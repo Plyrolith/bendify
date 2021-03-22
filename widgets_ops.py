@@ -290,7 +290,7 @@ class WidgetObjectsMixin():
         return widgets
     
     @staticmethod
-    def widgets_temp_collection_add(widgets, col_name="Widgets_edit"):
+    def collection_tmp_add(widgets, col_name="Widgets_edit"):
         """Build temporary widget collection and select widgets
         """
         D = bpy.data
@@ -299,7 +299,7 @@ class WidgetObjectsMixin():
             if col_name in D.collections:
                 D.collections.remove(D.collections[col_name])
             col = D.collections.new(col_name)
-            bpy.context.collection.children.link(col)
+            bpy.context.scene.collection.children.link(col)
             col.hide_select = False
             col.hide_viewport = False
             col.hide_render = True
@@ -313,7 +313,7 @@ class WidgetObjectsMixin():
         return col
 
     @staticmethod
-    def widgets_temp_collection_remove(col_name="Widgets_edit"):
+    def collection_tmp_remove(col_name="Widgets_edit"):
         """Build temporary widget collection and select widgets
         """
         if col_name in bpy.data.collections:
@@ -417,22 +417,11 @@ class BENDIFY_OT_WidgetsBevel(bpy.types.Operator, WidgetObjectsMixin):
     bl_label = "Bevel Widgets"
     bl_options = {'REGISTER', 'UNDO'}
 
+    remove: bpy.props.BoolProperty(name="Remove", default=False)
     delta: bpy.props.FloatProperty(name="Delta", default=0.0)
     bevel_resolution: bpy.props.IntProperty(name="Resolution", default=2)
     use_fill_caps: bpy.props.BoolProperty(name="Fill Caps", default=True)
     use_smooth: bpy.props.BoolProperty(name="Smooth Curves", default=True)
-
-    '''
-    mode: bpy.props.EnumProperty(
-        name="Transform Mode",
-        items=[
-            ('LOCATION', "Location", "Location"),
-            ('ROTATION', "Rotation", "Rotation"),
-            ('SCALE', "Scale", "Scale")
-        ],
-        default='SCALE'
-    )
-    '''
 
     @classmethod
     def poll(cls, context):
@@ -441,69 +430,94 @@ class BENDIFY_OT_WidgetsBevel(bpy.types.Operator, WidgetObjectsMixin):
     def execute(self, context):
         self.prepare_widgets(context)
         self.bevel()
-        self.viewport_settings()
-        self.viewport_fix_remove(self.widgets)
-        self.widgets_temp_collection_remove(col_name="Widgets_bevel")
+        self.curve_settings()
+        self.curve_fix_remove()
+        self.cleanup_widgets(context)
+        self.collection_tmp_remove(col_name="Widgets_bevel")
+        context.window.cursor_modal_restore()
         return {'FINISHED'}
 
+    def cancel(self, context):
+        for k, v in self.widgets.items():
+            bpy.data.objects[k].data.bevel_depth = v['depth']
+        self.curve_fix_remove()
+        self.cleanup_widgets(context)
+        self.collection_tmp_remove(col_name="Widgets_bevel")
+        context.window.cursor_modal_restore()
+
     def modal(self, context, event):
-        if event.type == 'MOUSEMOVE':
+        if event.shift:
+            self.precision = 10000
+        else:
+            self.precision = 1000
+
+        if event.type == 'MOUSEMOVE' or event.type == 'LEFT_SHIFT':
             self.delta = (event.mouse_x - self.x_init) / self.precision
             self.bevel()
-            
-        elif event.type == 'LEFT_SHIFT':
-            if event.value == 'PRESS':
-                self.precision = 10000
-            if event.value == 'RELEASE':
-                self.precision = 1000
-            self.bevel()
         
+        elif event.type == 'X':
+            if event.value == 'PRESS':
+                if self.remove:
+                    self.remove = False
+                else:
+                    self.remove = True
+                self.bevel()
+
         elif event.type == 'LEFTMOUSE':
             self.execute(context)
-            context.window.cursor_modal_restore()
             return {'FINISHED'}
         
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
-            for k, v in self.widgets.items():
-                bpy.data.objects[k].data.bevel_depth = v['depth']
-            self.viewport_fix_remove(self.widgets)
-            self.widgets_temp_collection_remove(col_name="Widgets_bevel")
-            context.window.cursor_modal_restore()
+            self.cancel(context)
             return {'CANCELLED'}
         
         return {'RUNNING_MODAL'}
         
     def invoke(self, context, event):
-        # Convert widgets to curves
         widgets_obj = self.prepare_widgets(context)
 
         # Store initial bevel depth and mouse position, set viewport fix
         self.widgets = {}
         for w in widgets_obj:
-            self.viewport_fix_add(w)
-            self.widgets[w.name] = {'depth': w.data.bevel_depth, 'scale': w.scale}
+            self.widgets[w.name] = {
+                'depth': w.data.bevel_depth,
+                'scale': w.scale
+            }
 
-        # Initial viewport settings
-        self.viewport_settings()
+        # Initial curve settings
+        self.curve_fix_add()
+        self.curve_settings()
 
         # Setup modal values
         self.x_init = event.mouse_x
         self.delta = 0
         self.precision = 1000
+        self.remove = False
         
         # Modal
         context.window.cursor_modal_set('SCROLL_X')
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
+    def draw(self, context):
+        layout = self.layout
+        layout.column().row().prop(self, 'remove', toggle=True)
+        col = layout.column()
+        col.row().prop(self, 'delta')
+        col.row().prop(self, 'bevel_resolution')
+        col.row().prop(self, 'use_fill_caps')
+        col.row().prop(self, 'use_smooth')
+        if self.remove:
+            col.enabled = False
+
     def bevel(self):
         for k, v in self.widgets.items():
             scale_avg = max((v['scale'][0] + v['scale'][1] + v['scale'][2]) / 3, 0.0001)
-            bpy.data.objects[k].data.bevel_depth = abs(
+            bpy.data.objects[k].data.bevel_depth = 0 if self.remove else abs(
                 v['depth'] + self.delta / scale_avg
             )
 
-    def viewport_settings(self):
+    def curve_settings(self):
         for widget in self.widgets:
             w = bpy.data.objects[widget]
             w.data.bevel_resolution = self.bevel_resolution
@@ -512,9 +526,10 @@ class BENDIFY_OT_WidgetsBevel(bpy.types.Operator, WidgetObjectsMixin):
                 spline.use_smooth = self.use_smooth
 
     def prepare_widgets(self, context):
-        # Collect widgets
+        """Collect widgets
+        """
         widgets_obj = self.widgets_from_pose_bones(context.selected_pose_bones)
-        self.widgets_temp_collection_add(widgets_obj, col_name="Widgets_bevel")
+        self.collection_tmp_add(widgets_obj, col_name="Widgets_bevel")
 
         # Convert to curves
         widgets_mesh = [w for w in widgets_obj if not w.type == 'CURVE']
@@ -528,20 +543,38 @@ class BENDIFY_OT_WidgetsBevel(bpy.types.Operator, WidgetObjectsMixin):
             context.view_layer.objects.active = act
         
         return widgets_obj
+    
+    def cleanup_widgets(self, context):
+        """Convert widgets back to mesh if there's no bevel
+        """
+        widgets_mesh = [
+            bpy.data.objects[w] for w in self.widgets \
+            if bpy.data.objects[w].data.bevel_depth <= 0
+        ]
+        if widgets_mesh:
+            act = context.active_object
+            c = context.copy()
+            c['mode'] = 'OBJECT'
+            c['active_object'] = widgets_mesh[0]
+            c['selected_objects'] = widgets_mesh
+            bpy.ops.object.convert(c, target='MESH')
+            context.view_layer.objects.active = act
 
-    @staticmethod
-    def viewport_fix_add(obj):
-        # Add triangulate modifiers to fix zero bevel invisibility
-        if not any(m.name == "Viewport Fix" for m in obj.modifiers):
-            tri = obj.modifiers.new(name="Viewport Fix", type='TRIANGULATE')
-            tri.quad_method = 'FIXED'
-            tri.ngon_method = 'CLIP'
-            tri.min_vertices = 128
+    def curve_fix_add(self):
+        """Add triangulate modifiers to fix zero bevel invisibility
+        """
+        for widget in self.widgets:
+            w = bpy.data.objects[widget]
+            if not any(m.name == "Viewport Fix" for m in w.modifiers):
+                tri = w.modifiers.new(name="Viewport Fix", type='TRIANGULATE')
+                tri.quad_method = 'FIXED'
+                tri.ngon_method = 'CLIP'
+                tri.min_vertices = 128
 
-    @staticmethod
-    def viewport_fix_remove(widgets):
-        # Remove triangulate modifiers if bevel > 0
-        for widget in widgets:
+    def curve_fix_remove(self):
+        """Remove triangulate modifiers if bevel > 0
+        """
+        for widget in self.widgets:
             w = bpy.data.objects[widget]
             if w.data.bevel_depth > 0:
                 for mod in w.modifiers:
@@ -579,7 +612,7 @@ class BENDIFY_OT_WidgetsEditStart(bpy.types.Operator, WidgetEditMixin, WidgetObj
         
         bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.select_all(action='DESELECT')
-        self.widgets_temp_collection_add(widgets)
+        self.collection_tmp_add(widgets)
             
         # ... or set it to the first selected
         if not widget_active:
@@ -622,7 +655,6 @@ class BENDIFY_OT_WidgetsEditStop(bpy.types.Operator, WidgetEditMixin, WidgetObje
             and context.active_object.name in col.objects \
             and s['edit_widgets'] \
             and any(arma for arma in s['edit_widgets']["armatures"] if arma.name in s.objects):
-
                 # Select/activate armatures and go into pose mode
                 bpy.ops.object.mode_set(mode='OBJECT')
                 bpy.ops.object.select_all(action='DESELECT')
@@ -641,7 +673,7 @@ class BENDIFY_OT_WidgetsEditStop(bpy.types.Operator, WidgetEditMixin, WidgetObje
                 self.pivot(context, s['edit_widgets']["pivot"])
     
         # Remove Widget_edit collection
-        self.widgets_temp_collection_remove()
+        self.collection_tmp_remove()
         
         # Remove temporary scene property
         del s['edit_widgets']
