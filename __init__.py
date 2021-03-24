@@ -23,6 +23,7 @@ classes = (
     BENDIFY_OT_AlmAdd,
     BENDIFY_OT_AlmSolo,
     BENDIFY_OT_DrawBlendSwitch,
+    BENDIFY_OT_ReparentObjectsToBones,
     BENDIFY_OT_ForceDriversUpdate,
     BENDIFY_OT_StretchToReset,
     BENDIFY_OT_ConstraintsMirror,

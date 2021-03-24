@@ -28,6 +28,43 @@ class BENDIFY_OT_RigifyCopyToSelected(bpy.types.Operator):
                         setattr(pb.rigify_parameters, k, getattr(act.rigify_parameters, k))
         return {"FINISHED"}
 
+class BENDIFY_OT_ReparentObjectsToBones(bpy.types.Operator):
+    """Fix parenting offset for Objects parented to Bones"""
+    bl_idname = 'object.reparent_objects_to_bones'
+    bl_label = "Fix Bone Parenting for Selected"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    #selected: bpy.props.BoolProperty(name="Selected Only", default=True)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT' and context.selected_objects
+    
+    def execute(self, context):
+        act = context.active_object
+        objs = context.selected_objects
+        for obj in objs:
+            if obj.parent_type == 'BONE' and obj.parent and obj.parent_bone:
+                bpy.ops.object.select_all(action='DESELECT')
+
+                arma = obj.parent
+                layers = [i for i in arma.data.layers]
+                arma.data.layers = [True] * 32
+                arma.data.bones.active = arma.data.bones[obj.parent_bone]
+
+                obj.select_set(True)
+
+                arma.select_set(True)
+                context.view_layer.objects.active = arma
+
+                bpy.ops.object.parent_set(type='BONE_RELATIVE')
+                arma.data.layers = layers
+        
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in objs:
+            obj.select_set(True)
+        context.view_layer.objects.active = act
+        return {"FINISHED"}
 
 class BENDIFY_OT_ForceDriversUpdate(bpy.types.Operator):
     """Force Drivers of specified datablocks to update"""

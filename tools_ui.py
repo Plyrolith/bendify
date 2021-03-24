@@ -33,6 +33,7 @@ class BendifyToolsObjectPanel():
         layout = self.layout
         col = layout.column()
 
+        col.row().operator('object.reparent_objects_to_bones', icon='BONE_DATA')
         col.row().operator('object.force_drivers_update', icon='DRIVER')
         col.row().operator('object.object_names_normalize', icon='FILE_TEXT')
         col.row().operator('view3d.material_slots_switch', icon='MATERIAL')
