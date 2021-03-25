@@ -45,7 +45,7 @@ class BENDIFY_OT_ReparentObjectsToBones(bpy.types.Operator):
         objs = context.selected_objects
         for obj in objs:
             if obj.parent_type == 'BONE' and obj.parent_bone \
-            and obj.parent and obj.parent in context.view_layer.objects:
+            and obj.parent and obj.parent.name in context.view_layer.objects:
                 bpy.ops.object.select_all(action='DESELECT')
 
                 parent = obj.parent
