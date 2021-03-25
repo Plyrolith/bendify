@@ -44,21 +44,22 @@ class BENDIFY_OT_ReparentObjectsToBones(bpy.types.Operator):
         act = context.active_object
         objs = context.selected_objects
         for obj in objs:
-            if obj.parent_type == 'BONE' and obj.parent and obj.parent_bone:
+            if obj.parent_type == 'BONE' and obj.parent_bone \
+            and obj.parent and obj.parent in context.view_layer.objects:
                 bpy.ops.object.select_all(action='DESELECT')
 
-                arma = obj.parent
-                layers = [i for i in arma.data.layers]
-                arma.data.layers = [True] * 32
-                arma.data.bones.active = arma.data.bones[obj.parent_bone]
+                parent = obj.parent
+                arma = parent.data
+                layers = [i for i in arma.layers]
+                arma.layers = [True] * 32
+                arma.bones.active = arma.bones[obj.parent_bone]
 
                 obj.select_set(True)
-
-                arma.select_set(True)
-                context.view_layer.objects.active = arma
+                parent.select_set(True)
+                context.view_layer.objects.active = parent
 
                 bpy.ops.object.parent_set(type='BONE_RELATIVE')
-                arma.data.layers = layers
+                arma.layers = layers
         
         bpy.ops.object.select_all(action='DESELECT')
         for obj in objs:
