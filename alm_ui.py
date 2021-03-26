@@ -1,5 +1,6 @@
-import bpy
+from bpy.types import Panel
 from .alm_ops import AlmMixIn
+
 
 class ArmatureLayerManagerPanel(AlmMixIn):
     """Armature Layer Panel drawing class"""    
@@ -362,8 +363,9 @@ class ArmatureLayerManagerPanel(AlmMixIn):
                 self.edit(context)
             elif bendify.alm_mode == 'PREVIEW':
                 self.preview(context)
-        
-class BENDIFY_PT_ArmatureLayerManagerViewport(bpy.types.Panel, ArmatureLayerManagerPanel):
+
+  
+class BENDIFY_PT_ArmatureLayerManagerViewport(Panel, ArmatureLayerManagerPanel):
     bl_category = "Bendify"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'

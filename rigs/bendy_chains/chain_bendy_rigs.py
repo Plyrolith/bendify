@@ -1,24 +1,4 @@
-#====================== BEGIN GPL LICENSE BLOCK ======================
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-#======================= END GPL LICENSE BLOCK ========================
-
-# <pep8 compliant>
-
-import bpy
+from bpy.props import *
 
 from itertools import count
 
@@ -139,7 +119,7 @@ class ChainBendyRig(HandleBendyRig):
 
     @classmethod
     def add_parameters(self, params):
-        params.org_transform_fk = bpy.props.EnumProperty(
+        params.org_transform_fk = EnumProperty(
             name="ORG Transform base",
             items=(
                 ('FK', "FK Controls", "FK Controls"),
@@ -313,19 +293,19 @@ class SegmentedChainBendyRig(ChainBendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.segmented_fk = bpy.props.BoolProperty(
+        params.segmented_fk = BoolProperty(
             name="Segmented FK",
             description="Isolate FK controller scaling",
             default=False
             )
         
-        params.segmented_align = bpy.props.BoolProperty(
+        params.segmented_align = BoolProperty(
             name="Align Segments",
             description="Align segment scaling by default for better control; may result in unexprected master scaling behavior",
             default=True
             )
 
-        params.segmented_rotation_follow_default = bpy.props.FloatProperty(
+        params.segmented_rotation_follow_default = FloatProperty(
             name="Rotation Follow Default",
             default=1.0,
             min=0.0,
@@ -333,7 +313,7 @@ class SegmentedChainBendyRig(ChainBendyRig):
             description="Default rotation follow per segment"
         )
 
-        params.segmented_rotation_follow_panel = bpy.props.BoolProperty(
+        params.segmented_rotation_follow_panel = BoolProperty(
             name="Rotation Follow Panel",
             default=False,
             description="Add panel to control rotation follow to the UI"
@@ -434,14 +414,14 @@ class MasterControlChainBendyRig(ChainBendyRig):
             ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
         )
 
-        params.master_rotation_mode = bpy.props.EnumProperty(
+        params.master_rotation_mode = EnumProperty(
             name="Default Master Control Rotation Mode",
             items=rotation_modes,
             default='XYZ',
             description="Default rotation mode for master control"
         )
 
-        params.master_control = bpy.props.BoolProperty(
+        params.master_control = BoolProperty(
             name="Master Control",
             description="Add master controller for the whole chain",
             default=False

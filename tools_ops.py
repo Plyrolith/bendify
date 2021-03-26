@@ -1,10 +1,14 @@
-import bpy
 import re
 import unicodedata
 
+import bpy
+from bpy.props import *
+from bpy.types import Operator
+
 from .utils.misc import attribute_return
 
-class BENDIFY_OT_RigifyCopyToSelected(bpy.types.Operator):
+
+class BENDIFY_OT_RigifyCopyToSelected(Operator):
     """Copy Rigify properties to from active to selected pose bones"""
     bl_idname = 'pose.rigify_copy_to_selected'
     bl_label = "Copy to Selected"
@@ -28,13 +32,14 @@ class BENDIFY_OT_RigifyCopyToSelected(bpy.types.Operator):
                         setattr(pb.rigify_parameters, k, getattr(act.rigify_parameters, k))
         return {"FINISHED"}
 
-class BENDIFY_OT_ReparentObjectsToBones(bpy.types.Operator):
+
+class BENDIFY_OT_ReparentObjectsToBones(Operator):
     """Fix parenting offset for Objects parented to Bones"""
     bl_idname = 'object.reparent_objects_to_bones'
     bl_label = "Fix Bone Parenting for Selected"
     bl_options = {'REGISTER', 'UNDO'}
 
-    #selected: bpy.props.BoolProperty(name="Selected Only", default=True)
+    #selected: BoolProperty(name="Selected Only", default=True)
 
     @classmethod
     def poll(cls, context):
@@ -46,7 +51,7 @@ class BENDIFY_OT_ReparentObjectsToBones(bpy.types.Operator):
         for obj in objs:
             if obj.parent_type == 'BONE' and obj.parent_bone \
             and obj.parent and obj.parent.name in context.view_layer.objects:
-                bpy.ops.object.select_all(action='DESELECT')
+                O.object.select_all(action='DESELECT')
 
                 parent = obj.parent
                 arma = parent.data
@@ -58,41 +63,42 @@ class BENDIFY_OT_ReparentObjectsToBones(bpy.types.Operator):
                 parent.select_set(True)
                 context.view_layer.objects.active = parent
 
-                bpy.ops.object.parent_set(type='BONE_RELATIVE')
+                O.object.parent_set(type='BONE_RELATIVE')
                 arma.layers = layers
         
-        bpy.ops.object.select_all(action='DESELECT')
+        O.object.select_all(action='DESELECT')
         for obj in objs:
             obj.select_set(True)
         context.view_layer.objects.active = act
         return {"FINISHED"}
 
-class BENDIFY_OT_ForceDriversUpdate(bpy.types.Operator):
+
+class BENDIFY_OT_ForceDriversUpdate(Operator):
     """Force Drivers of specified datablocks to update"""
     bl_idname = 'object.force_drivers_update'
     bl_label = "Force Drivers Update"
     bl_options = {'REGISTER', 'UNDO'}
 
-    use_objects: bpy.props.BoolProperty(name="Objects", default=True)
-    use_meshes: bpy.props.BoolProperty(name="Meshes", default=True)
-    use_curves: bpy.props.BoolProperty(name="Curves", default=True)
-    use_volumes: bpy.props.BoolProperty(name="Volumes", default=True)
-    use_metaballs: bpy.props.BoolProperty(name="Metaballs", default=True)
-    use_lattices: bpy.props.BoolProperty(name="Lattices", default=True)
-    use_armatures: bpy.props.BoolProperty(name="Armatures", default=True)
-    use_cameras: bpy.props.BoolProperty(name="Cameras", default=True)
-    use_lights: bpy.props.BoolProperty(name="Lights", default=True)
-    use_lightprobes: bpy.props.BoolProperty(name="Light Probes", default=True)
-    use_grease_pencils: bpy.props.BoolProperty(name="Grease Pencils", default=True)
-    use_actions: bpy.props.BoolProperty(name="Actions", default=True)
-    use_materials: bpy.props.BoolProperty(name="Materials", default=True)
-    use_node_groups: bpy.props.BoolProperty(name="Node Groups", default=True)
-    use_particles: bpy.props.BoolProperty(name="Particles", default=True)
-    use_cache_files: bpy.props.BoolProperty(name="Cache Files", default=True)
-    use_scenes: bpy.props.BoolProperty(name="Scenes", default=True)
-    use_images: bpy.props.BoolProperty(name="Images", default=True)
-    use_movieclips: bpy.props.BoolProperty(name="Movie Clips", default=True)
-    use_speakers: bpy.props.BoolProperty(name="Speakers", default=True)
+    use_objects: BoolProperty(name="Objects", default=True)
+    use_meshes: BoolProperty(name="Meshes", default=True)
+    use_curves: BoolProperty(name="Curves", default=True)
+    use_volumes: BoolProperty(name="Volumes", default=True)
+    use_metaballs: BoolProperty(name="Metaballs", default=True)
+    use_lattices: BoolProperty(name="Lattices", default=True)
+    use_armatures: BoolProperty(name="Armatures", default=True)
+    use_cameras: BoolProperty(name="Cameras", default=True)
+    use_lights: BoolProperty(name="Lights", default=True)
+    use_lightprobes: BoolProperty(name="Light Probes", default=True)
+    use_grease_pencils: BoolProperty(name="Grease Pencils", default=True)
+    use_actions: BoolProperty(name="Actions", default=True)
+    use_materials: BoolProperty(name="Materials", default=True)
+    use_node_groups: BoolProperty(name="Node Groups", default=True)
+    use_particles: BoolProperty(name="Particles", default=True)
+    use_cache_files: BoolProperty(name="Cache Files", default=True)
+    use_scenes: BoolProperty(name="Scenes", default=True)
+    use_images: BoolProperty(name="Images", default=True)
+    use_movieclips: BoolProperty(name="Movie Clips", default=True)
+    use_speakers: BoolProperty(name="Speakers", default=True)
 
     def force_update(self, datablocks):
         count = 0
@@ -155,20 +161,20 @@ class BENDIFY_OT_ForceDriversUpdate(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class BENDIFY_OT_StretchToReset(bpy.types.Operator):
+class BENDIFY_OT_StretchToReset(Operator):
     """Reset Stretch To constraint length for bones"""
     bl_idname = 'pose.stretchto_reset'
     bl_label = "Reset Strech Constraints"
     bl_options = {'REGISTER', 'UNDO'}
 
-    selected: bpy.props.BoolProperty(name="Selected Only", default=True)
+    selected: BoolProperty(name="Selected Only", default=True)
     
     @classmethod
     def poll(cls, context):
         return context.mode == 'POSE'
 
     def execute(self, context):
-        #bpy.ops.constraint.stretchto_reset()
+        #O.constraint.stretchto_reset()
 
         # Selection only
         if self.selected:
@@ -194,13 +200,13 @@ class BENDIFY_OT_StretchToReset(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
+class BENDIFY_OT_ConstraintsMirror(Operator):
     """Mirror Constraints of selected Bones to or from the other side"""
     bl_idname = 'pose.constraints_mirror'
     bl_label = "Mirror Constraints"
     bl_options = {'REGISTER', 'UNDO'}
 
-    receive_constraints: bpy.props.BoolProperty(name="Receive Constraints", default=False)
+    receive_constraints: BoolProperty(name="Receive Constraints", default=False)
 
     @classmethod
     def poll(cls, context):
@@ -232,7 +238,7 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
             obj = pb.id_data
             mb = mirror_bone(pb)
             if mb:
-                bpy.ops.pose.select_all(action='DESELECT')
+                O.pose.select_all(action='DESELECT')
                 obj.data.bones[pb.name].select = True
                 obj.data.bones[mb.name].select = True
 
@@ -241,7 +247,7 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
                 obj.data.bones.active = obj.data.bones[givr.name]
 
                 if givr.constraints:
-                    bpy.ops.pose.constraints_copy()
+                    O.pose.constraints_copy()
 
                     # Fix sides for targets/subtargets
                     for c in rcvr.constraints:
@@ -255,7 +261,7 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
                                     t.subtarget = mirror_name(t.subtarget) or t.subtarget
         
         # Restore selection and active bone
-        bpy.ops.pose.select_all(action='DESELECT')
+        O.pose.select_all(action='DESELECT')
         for bone_sel in pbones:
             bone_sel.id_data.data.bones[bone_sel.name].select = True
         if pb_active:
@@ -263,16 +269,16 @@ class BENDIFY_OT_ConstraintsMirror(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
+class BENDIFY_OT_ConstraintsAddArmature(Operator):
     """Add armature constraints with targets"""
     bl_idname = 'pose.constraints_add_armature'
     bl_label = "Add Targeted Armature Constraints"
     bl_options = {'REGISTER', 'UNDO'}
 
-    use_bone_envelopes: bpy.props.BoolProperty(name="Preserve Volume", default=False)
-    use_deform_preserve_volume: bpy.props.BoolProperty(name="Use Envelopes", default=False)
-    use_current_location: bpy.props.BoolProperty(name="Use Current Location", default=False)
-    mode: bpy.props.EnumProperty(
+    use_bone_envelopes: BoolProperty(name="Preserve Volume", default=False)
+    use_deform_preserve_volume: BoolProperty(name="Use Envelopes", default=False)
+    use_current_location: BoolProperty(name="Use Current Location", default=False)
+    mode: EnumProperty(
         items=(
             ('ACTIVE', 'Active', 'Active'),
             ('SELECTED', 'Selected', 'Selected'),
@@ -281,8 +287,8 @@ class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
         name='Targeting Mode',
         default='ACTIVE'
     )
-    redistribute: bpy.props.BoolProperty(name="Redistribute Weights", default=False)
-    parent_clear: bpy.props.BoolProperty(name="Clear Parent", default=True)
+    redistribute: BoolProperty(name="Redistribute Weights", default=False)
+    parent_clear: BoolProperty(name="Clear Parent", default=True)
 
     @classmethod
     def poll(cls, context):
@@ -361,12 +367,12 @@ class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
         # Clear parenting
         if self.parent_clear:
             try:
-                bpy.ops.object.mode_set(mode='EDIT')
+                O.object.mode_set(mode='EDIT')
                 for b in pairing:
                     if b.parent:
                         b.id_data.data.edit_bones[b.name].parent = None
                         b.id_data.update_from_editmode()
-                bpy.ops.object.mode_set(mode='POSE')
+                O.object.mode_set(mode='POSE')
             except:
                 print("Unparenting failed. Linked Armature Data?")
 
@@ -386,17 +392,17 @@ class BENDIFY_OT_ConstraintsAddArmature(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
+class BENDIFY_OT_ObjectNamesNormalize(Operator):
     """Rename objects to match the optimal pattern"""
     bl_idname = 'object.object_names_normalize'
     bl_label = "Rename Objects"
     bl_options = {'REGISTER', 'UNDO'}
 
-    selected: bpy.props.BoolProperty(name="Selected Only", default=True)
-    lower: bpy.props.BoolProperty(name="Lowercase", default=True)
-    data: bpy.props.BoolProperty(name="Data", default=True)
-    multi: bpy.props.BoolProperty(name="Multi Guess", default=True)
-    widgets: bpy.props.BoolProperty(name="Widgets", default=False)
+    selected: BoolProperty(name="Selected Only", default=True)
+    lower: BoolProperty(name="Lowercase", default=True)
+    data: BoolProperty(name="Data", default=True)
+    multi: BoolProperty(name="Multi Guess", default=True)
+    widgets: BoolProperty(name="Widgets", default=False)
 
     prefixes = {
             'ARMATURE': "RIG",
@@ -569,13 +575,13 @@ class BENDIFY_OT_ObjectNamesNormalize(bpy.types.Operator):
         return (obj_names, data_names)
 
 
-class BENDIFY_OT_MaterialSlotsSwitch(bpy.types.Operator):
+class BENDIFY_OT_MaterialSlotsSwitch(Operator):
     """Convert material slots links for selected objects"""
     bl_idname = 'view3d.material_slots_switch'
     bl_label = "Switch Material Slot Links"
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(
+    mode: EnumProperty(
             items=[
                 ('OBJECT', "Object", "Object", 'OBJECT_DATA', 0),
                 ('DATA', "Data", "Data", 'MESH_DATA', 1)
@@ -583,8 +589,8 @@ class BENDIFY_OT_MaterialSlotsSwitch(bpy.types.Operator):
             name="Link Mode",
             default='OBJECT'
         )
-    selected: bpy.props.BoolProperty(name="Selected Only", default=True)
-    unlink: bpy.props.BoolProperty(name="Unlink Material from Other Slot", default=False)
+    selected: BoolProperty(name="Selected Only", default=True)
+    unlink: BoolProperty(name="Unlink Material from Other Slot", default=False)
 
     @classmethod
     def poll(cls, context):
@@ -623,13 +629,13 @@ class BENDIFY_OT_MaterialSlotsSwitch(bpy.types.Operator):
         col.row().prop(self, 'unlink')
 
 
-class BENDIFY_OT_MirrorAllWeights(bpy.types.Operator):
+class BENDIFY_OT_MirrorAllWeights(Operator):
     """Mirror all weights from one side to another"""
     bl_idname = 'object.mirror_all_weights'
     bl_label = "Mirror All Weights"
     bl_options = {'REGISTER', 'UNDO'}
 
-    direction: bpy.props.EnumProperty(
+    direction: EnumProperty(
             items=[
                 ('L_TO_R', "Left to Right", "Left to Right"),
                 ('R_TO_L', "Right to Left", "Right to Left"),
@@ -637,8 +643,8 @@ class BENDIFY_OT_MirrorAllWeights(bpy.types.Operator):
             name="Direction",
             default='L_TO_R'
         )
-    selected: bpy.props.BoolProperty(name="Selected Only", default=True)
-    locked: bpy.props.BoolProperty(name="Include Locked", default=False)
+    selected: BoolProperty(name="Selected Only", default=True)
+    locked: BoolProperty(name="Include Locked", default=False)
 
     @classmethod
     def poll(cls, context):
@@ -654,10 +660,10 @@ class BENDIFY_OT_MirrorAllWeights(bpy.types.Operator):
             i = v_groups.find(mirror)
             if i > -1:
                 v_groups.active_index = i
-                bpy.ops.object.vertex_group_remove(all=False, all_unlocked=False)
+                O.object.vertex_group_remove(all=False, all_unlocked=False)
             v_groups.active_index = vg.index
-            bpy.ops.object.vertex_group_copy()
-            bpy.ops.object.vertex_group_mirror(use_topology=False)
+            O.object.vertex_group_copy()
+            O.object.vertex_group_mirror(use_topology=False)
             v_groups[v_groups.active_index].name = mirror
         
         act = context.active_object
@@ -698,13 +704,13 @@ class BENDIFY_OT_MirrorAllWeights(bpy.types.Operator):
         col.row().prop(self, 'locked')
 
 
-class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
+class BENDIFY_OT_DrawBlendSwitch(Operator):
     """Switch brush blend method in drawing mode"""
     bl_idname = 'paint.blend_switch'
     bl_label = "Draw Blend Switch"
     bl_options = {'REGISTER'}
 
-    brush: bpy.props.EnumProperty(
+    brush: EnumProperty(
         items=(
             ('ACTIVE', 'Active', 'Active', 'GREASEPENCIL', 0),
             ('DRAW', 'Draw', 'Draw', 'BRUSH_DATA', 1),
@@ -713,7 +719,7 @@ class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
         name="Brush",
         default='ACTIVE'
     )
-    blend: bpy.props.EnumProperty(
+    blend: EnumProperty(
         items=(
             ('ADD', 'Add', 'Add', 'ADD', 0),
             ('SUB', 'Sutract', 'Subtract', 'REMOVE', 1),
@@ -722,7 +728,7 @@ class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
         name="Blend",
         default='ADD'
     )
-    notify: bpy.props.BoolProperty(name="Report Type", default=True)
+    notify: BoolProperty(name="Report Type", default=True)
 
     @classmethod
     def poll(cls, context):
@@ -760,7 +766,7 @@ class BENDIFY_OT_DrawBlendSwitch(bpy.types.Operator):
         brush.use_paint_weight = True
 
         paint.brush = brush
-        bpy.ops.wm.tool_set_by_id(name="builtin_brush.Draw")
+        O.wm.tool_set_by_id(name="builtin_brush.Draw")
         if self.notify:
             self.report({'INFO'}, brush.name + " set to " + self.blend)
         return {"FINISHED"}

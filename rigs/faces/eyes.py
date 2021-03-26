@@ -1,5 +1,10 @@
-import bpy, re
+import re
+
+import bpy
+from bpy.props import *
+
 from mathutils import Vector
+
 from rigify.utils import copy_bone, flip_bone
 from rigify.utils import org, strip_org, make_deformer_name, connected_children_names, make_mechanism_name
 from rigify.utils import create_widget
@@ -623,22 +628,22 @@ def add_parameters(params):
     """
 
     # Setting up extra layers for the tweak bones
-    params.eyes_primary_layers_extra = bpy.props.BoolProperty(
+    params.eyes_primary_layers_extra = BoolProperty(
         name="eyes_primary_layers_extra",
         default=True,
         description=""
         )
-    params.eyes_primary_layers = bpy.props.BoolVectorProperty(
+    params.eyes_primary_layers = BoolVectorProperty(
         size=32,
         description="Layers for the primary controls to be on",
         default=tuple([i == 1 for i in range(0, 32)])
         )
-    params.eyes_secondary_layers_extra = bpy.props.BoolProperty(
+    params.eyes_secondary_layers_extra = BoolProperty(
         name="eyes_secondary_layers_extra",
         default=True,
         description=""
         )
-    params.eyes_secondary_layers = bpy.props.BoolVectorProperty(
+    params.eyes_secondary_layers = BoolVectorProperty(
         size=32,
         description="Layers for the secondary controls to be on",
         default=tuple([i == 1 for i in range(0, 32)])

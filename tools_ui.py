@@ -1,4 +1,5 @@
-import bpy
+from bpy.types import Panel
+
 
 class BendifyToolsPosePanel():
     """General pose tools panel"""
@@ -47,7 +48,7 @@ class BendifyToolsWeightPaintPanel():
 
         col.row().operator('object.mirror_all_weights', icon='MOD_MIRROR')
 
-class BENDIFY_PT_BendifyToolsPose(bpy.types.Panel, BendifyToolsPosePanel):
+class BENDIFY_PT_BendifyToolsPose(Panel, BendifyToolsPosePanel):
     bl_category = "Bendify"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -59,7 +60,7 @@ class BENDIFY_PT_BendifyToolsPose(bpy.types.Panel, BendifyToolsPosePanel):
     def poll(self, context):
         return context.mode == 'POSE'
     
-class BENDIFY_PT_BendifyToolsObject(bpy.types.Panel, BendifyToolsObjectPanel):
+class BENDIFY_PT_BendifyToolsObject(Panel, BendifyToolsObjectPanel):
     bl_category = "Bendify"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -70,7 +71,7 @@ class BENDIFY_PT_BendifyToolsObject(bpy.types.Panel, BendifyToolsObjectPanel):
     def poll(self, context):
         return context.mode == 'OBJECT'
 
-class BENDIFY_PT_BendifyToolsWeightPaint(bpy.types.Panel, BendifyToolsWeightPaintPanel):
+class BENDIFY_PT_BendifyToolsWeightPaint(Panel, BendifyToolsWeightPaintPanel):
     bl_category = "Bendify"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'

@@ -60,3 +60,13 @@ def threewise(iterable):
     p = [None] + list(prv)[:-1]
     n = list(nxt)[1:] + [None]
     return zip(p, c, n)
+
+#=============================================
+# Strings
+#=============================================
+
+def var_name(i):
+    if i == 0:
+        return "var"
+    else:
+        return "var_" + str(i).zfill(3)

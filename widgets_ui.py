@@ -1,4 +1,5 @@
-import bpy
+from bpy.types import Panel
+
 
 class BendifyWidgetsPanel():
     """General widget tools panel"""
@@ -22,7 +23,7 @@ class BendifyWidgetsPanel():
             row.operator('pose.widgets_edit_start', icon='MESH_DATA')
 
 
-class BENDIFY_PT_BendifyWidgets(bpy.types.Panel, BendifyWidgetsPanel):
+class BENDIFY_PT_BendifyWidgets(Panel, BendifyWidgetsPanel):
     bl_category = "Bendify"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'

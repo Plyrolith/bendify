@@ -1,24 +1,5 @@
-#====================== BEGIN GPL LICENSE BLOCK ======================
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-#======================= END GPL LICENSE BLOCK ========================
-
-# <pep8 compliant>
-
 import bpy
+from bpy.props import BoolProperty
 
 from itertools import count
 
@@ -355,13 +336,13 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
 
     @classmethod
     def add_parameters(self, params):
-        params.create_head_def = bpy.props.BoolProperty(
+        params.create_head_def = BoolProperty(
             name='Create head DEF',
             default=True,
             description='Create a deformation bone for the head itself'
         )
 
-        params.spine_end_to_neck = bpy.props.BoolProperty(
+        params.spine_end_to_neck = BoolProperty(
             name='Attach Spine End to Neck',
             default=True,
             description="If parented to a spine, the spine's end tweak will follow this neck"

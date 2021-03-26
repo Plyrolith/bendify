@@ -1,25 +1,6 @@
-# ====================== BEGIN GPL LICENSE BLOCK ======================
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ======================= END GPL LICENSE BLOCK ========================
+from bpy.props import *
 
-# <pep8 compliant>
-
-import bpy
-
+from collections.abc import Mapping
 from itertools import count
 
 from rigify.base_rig import BaseRig, stage
@@ -30,10 +11,14 @@ from rigify.utils.rig import connected_children_names
 from rigify.utils.bones import put_bone, copy_bone_position, align_bone_roll, align_bone_x_axis, align_bone_y_axis
 from rigify.utils.widgets_basic import create_sphere_widget
 
+from .props import ArmaConstraintTargets
 from .utils.bones import align_bone, align_bone_to_bone_axis, distance, real_bone
 from .utils.mechanism import make_armature_constraint
-from .utils.misc import threewise_nozip, attribute_return
+from .utils.misc import threewise_nozip, attribute_return, var_name
 from .utils.widgets_bendy import create_sub_tweak_widget, create_simple_arrow_widget
+
+
+# Rigs
 
 
 class BendyBoneMixin():
@@ -69,7 +54,7 @@ class ScaleOffsetMixin():
         ('Z', "Z", "Z")
     )
 
-    def bone_scale_offset(self, bone, target, map_x='X', map_y='Y', map_z='Z', use_x=True, use_y=True, use_z=True):
+    def bone_scale_offset(self, bone, target, map_x='X', map_y='Y', map_z='Z', use_x=True, use_y=True, use_z=True, index=-1):
         if map_x == 'NONE':
             use_x = False
             map_x = 'X'
@@ -81,7 +66,7 @@ class ScaleOffsetMixin():
             map_z = 'Z'
         
         if map_x == 'X' and map_y == 'Y' and map_z == 'Z':
-            self.make_constraint(
+            con = self.make_constraint(
                 bone,
                 'COPY_SCALE',
                 target,
@@ -91,8 +76,9 @@ class ScaleOffsetMixin():
                 use_y=use_y,
                 use_z=use_z
             )
+        
         else:
-            self.make_constraint(
+            con = self.make_constraint(
                 bone,
                 'TRANSFORM',
                 target,
@@ -111,6 +97,12 @@ class ScaleOffsetMixin():
                 to_min_z_scale=0 if use_z else 1,
                 mix_mode_scale='MULTIPLY'
             )
+        
+        # Move constraint
+        if index >= 0:
+            b = self.get_bone(bone)
+            i = b.constraints.find(con.name)
+            b.constraints.move(i, index)
 
 
 class BendyRig(BaseRig, BendyBoneMixin):
@@ -268,140 +260,71 @@ class BendyRig(BaseRig, BendyBoneMixin):
             None if handle_end else bbs.bbone_handle_type_end
         )
 
-    def drivers_bbone_ease(self, bone, handle_start, handle_end):
+    def driver_bbone_variable(self, handles, transform):
+        variables = {}
+        for i, handle in enumerate(handles):
+            var = var_name(i)
+            
+            # Transform
+            if isinstance(handle, Mapping) and transform in handle:
+                bone = handle['bone']
+                transform_type = handle[transform]
+            else:
+                bone = handle
+                transform_type = transform
+
+            # Build dict
+            if transform != 'NONE':
+                variables[var] = {
+                    'type': 'TRANSFORMS',
+                    'targets':
+                    [
+                        {
+                            'id': self.obj,
+                            'bone_target': bone,
+                            'transform_type': transform_type,
+                            'transform_space': 'LOCAL_SPACE',
+                        }
+                    ]
+                }
+        return variables
+    
+    @staticmethod
+    def driver_bbone_expression(handles, subtract_one=False):
+        ex = []
+        for i, handle in enumerate(handles):
+            var = var_name(i)
+            if subtract_one:
+                var = var + " - 1"
+            if isinstance(handle, Mapping) and 'weight' in handle:
+                var = "(" + var + ") * " + str(handle['weight'])
+            ex.append(var)
+        return " + ".join(ex)
+
+    def driver_bbone_make(self, bone, handles, data_path, transform, subtract_one=False):
         pbone = self.get_bone(bone)
-        space = 'LOCAL_SPACE'
-        v_type = 'TRANSFORMS'
-
-        ####################################################
-        # Easing
-
         self.make_driver(
             pbone,
-            'bbone_easein',
-            expression='scale_y - 1',
-            variables={
-                'scale_y': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': handle_start,
-                            'transform_type': 'SCALE_Y',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
+            data_path,
+            expression=self.driver_bbone_expression(handles, subtract_one),
+            variables=self.driver_bbone_variable(handles, transform)
         )
 
-        self.make_driver(
-            pbone,
-            'bbone_easeout',
-            expression='scale_y - 1',
-            variables={
-                'scale_y': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': handle_end,
-                            'transform_type': 'SCALE_Y',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
+    def driver_bbone_ease(self, bone, handles_in, handles_out):
+        for handles, data_path, transform in zip(
+            [handles_in, handles_out],
+            ['bbone_easein', 'bbone_easeout'],
+            ['SCALE_Y', 'SCALE_Y']
+        ):
+            self.driver_bbone_make(bone, handles, data_path, transform, True)
 
-    def drivers_bbone_scale(self, bone, handle_start, handle_end):
-        pbone = self.get_bone(bone)
-        space = 'LOCAL_SPACE'
-        v_type = 'TRANSFORMS'
-
-        ####################################################
-        # Scale X
-
-        self.make_driver(
-            pbone,
-            'bbone_scaleinx',
-            variables={
-                'scale_x': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': handle_start,
-                            'transform_type': 'SCALE_X',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        self.make_driver(
-            pbone,
-            'bbone_scaleoutx',
-            variables={
-                'scale_x': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': handle_end,
-                            'transform_type': 'SCALE_X',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        ####################################################
-        # Scale Z
-
-        self.make_driver(
-            pbone,
-            'bbone_scaleiny',
-            variables={
-                'scale_z': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': handle_start,
-                            'transform_type': 'SCALE_Z',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
-
-        self.make_driver(
-            pbone,
-            'bbone_scaleouty',
-            variables={
-                'scale_z': {
-                    'type': v_type,
-                    'targets':
-                    [
-                        {
-                            'id': self.obj,
-                            'bone_target': handle_end,
-                            'transform_type': 'SCALE_Z',
-                            'transform_space': space,
-                        }
-                    ]
-                }
-            }
-        )
+    def driver_bbone_scale(self, bone, handles_in, handles_out):
+        for handles, data_path, transform in zip(
+            [handles_in] * 2 + [handles_out] * 2,
+            ['bbone_scaleinx', 'bbone_scaleiny', 'bbone_scaleoutx', 'bbone_scaleouty'],
+            ['SCALE_X', 'SCALE_Z', 'SCALE_X', 'SCALE_Z']
+        ):
+            self.driver_bbone_make(bone, handles, data_path, transform)
 
     ####################################################
     # Tweak chain
@@ -520,14 +443,14 @@ class BendyRig(BaseRig, BendyBoneMixin):
     @stage.rig_bones
     def drivers_deform_chain(self):
         ctrls = self.bones.ctrl
-        for args in zip(self.bones.deform, ctrls.tweak, ctrls.tweak[1:]):
+        for args in zip(count(0), self.bones.deform, ctrls.tweak, ctrls.tweak[1:]):
             self.drivers_deform_bone(*args)
     
-    def drivers_deform_bone(self, bone, handle_start, handle_end):
+    def drivers_deform_bone(self, i, bone, handle_in, handle_out):
         if self.bbone_ease:
-            self.drivers_bbone_ease(bone, handle_start, handle_end)
+            self.driver_bbone_ease(bone, [handle_in], [handle_out])
         if self.bbone_scale:
-            self.drivers_bbone_scale(bone, handle_start, handle_end)
+            self.driver_bbone_scale(bone, [handle_in], [handle_out])
 
     ####################################################
     # UI
@@ -563,19 +486,19 @@ class BendyRig(BaseRig, BendyBoneMixin):
     
     @classmethod
     def add_parameters(self, params):
-        params.show_advanced = bpy.props.BoolProperty(
+        params.show_advanced = BoolProperty(
             name="Show Advanced Settings",
             default=False,
             description="Show more settings to fine-tune the rig"
         )
 
-        params.bbones_copy_properties = bpy.props.BoolProperty(
+        params.bbones_copy_properties = BoolProperty(
             name="Individual B-Bone Properties",
             default=False,
             description="Copy original B-Bone settings per bone"
         )
 
-        params.bbones_spine = bpy.props.IntProperty(
+        params.bbones_spine = IntProperty(
             name="B-Bone Segments",
             default=8,
             min=1,
@@ -583,38 +506,38 @@ class BendyRig(BaseRig, BendyBoneMixin):
             description="Number of B-Bone segments"
         )
 
-        params.bbones_easein = bpy.props.BoolProperty(
+        params.bbones_easein = BoolProperty(
             name="B-Bone Ease In",
             default=True,
             description="Deform easing in for first bone of chain"
         )
 
-        params.bbones_easeout = bpy.props.BoolProperty(
+        params.bbones_easeout = BoolProperty(
             name="B-Bone Ease Out",
             default=True,
             description="Deform easing out for last bone of chain"
         )
 
-        params.bbone_ease = bpy.props.BoolProperty(
+        params.bbone_ease = BoolProperty(
             name="Ease Drivers",
             default=True,
             description="B-Bone easing driven by tweak"
         )
 
-        params.bbone_scale = bpy.props.BoolProperty(
+        params.bbone_scale = BoolProperty(
             name="Scale Drivers",
             default=True,
             description="B-Bone scaling driven by tweak"
         )
 
-        params.rotation_mode_tweak = bpy.props.EnumProperty(
+        params.rotation_mode_tweak = EnumProperty(
             name="Default Tweak Controller Rotation Mode",
             items=self.rotation_modes,
             default='ZXY',
             description="Default rotation mode for tweak control bones"
         )
 
-        params.org_transform = bpy.props.EnumProperty(
+        params.org_transform = EnumProperty(
             name="ORG Transform base",
             items=(
                 ('DEF', "Deforms", "Deforms"),
@@ -625,7 +548,7 @@ class BendyRig(BaseRig, BendyBoneMixin):
             description="Source of ORG transformation; useful to determine children's behaviour"
         )
 
-        params.volume_deform_default = bpy.props.FloatProperty(
+        params.volume_deform_default = FloatProperty(
             name="Deform Volume Variation Default",
             default=1.0,
             soft_min=0.0,
@@ -633,7 +556,7 @@ class BendyRig(BaseRig, BendyBoneMixin):
             description="Default value for deform bone chain stretch volume variation"
         )
 
-        params.volume_deform_panel = bpy.props.BoolProperty(
+        params.volume_deform_panel = BoolProperty(
             name="Deform Volume Variation Panel",
             default=False,
             description="Add panel to control volume variation to the UI"
@@ -789,7 +712,7 @@ class HandleBendyRig(BendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.bbone_handles = bpy.props.EnumProperty(
+        params.bbone_handles = EnumProperty(
             name="B-Bone Handles",
             items=[
                 ('NONE', "None", "None"),
@@ -890,7 +813,7 @@ class ComplexBendyRig(BendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.complex_stretch = bpy.props.BoolProperty(
+        params.complex_stretch = BoolProperty(
             name="Complex Stretch Mechanics",
             description="Additional mechanical layer to separate stretch matrix and enable better non-uniform scaling at cost of additional complexity and non-standard hierarchy; worse export compatibiliy",
             default=False
@@ -975,42 +898,42 @@ class AlignedBendyRig(BendyRig):
             ('Z', "Z Preserve", "Z Preserve"),
         ]
 
-        params.align_y_start_axis = bpy.props.EnumProperty(
+        params.align_y_start_axis = EnumProperty(
             items=axes,
             name="Axis",
             default='Y',
             description="Orientation guide bone axis to use for start"
         )
 
-        params.align_y_end_axis = bpy.props.EnumProperty(
+        params.align_y_end_axis = EnumProperty(
             items=axes,
             name="Axis",
             default='Y',
             description="Orientation guide bone axis to use for end"
         )
 
-        params.align_y_start_preserve = bpy.props.EnumProperty(
+        params.align_y_start_preserve = EnumProperty(
             items=preserves,
             name="Preserve",
             default='X',
             description="Preserve this axis while re-orienting start"
         )
 
-        params.align_y_end_preserve = bpy.props.EnumProperty(
+        params.align_y_end_preserve = EnumProperty(
             items=preserves,
             name="Preserve",
             default='Z',
             description="Preserve this axis while re-orienting end"
         )
 
-        params.align_y_start = bpy.props.StringProperty(
+        params.align_y_start = StringProperty(
             name="Start Orientation",
             default="",
             description="Orientation guide bone for start"
         )
 
 
-        params.align_y_end = bpy.props.StringProperty(
+        params.align_y_end = StringProperty(
             name="End Orientation",
             default="",
             description="Orientation guide bone for end"
@@ -1031,17 +954,11 @@ class AttachedBendyRig(HandleBendyRig, ScaleOffsetMixin):
     def initialize(self):
         super().initialize()
 
-        self.base = self.params.base
-        self.base_scale_offset = self.params.base_scale_offset
-        self.base_scale_x = self.params.base_scale_x
-        self.base_scale_y = self.params.base_scale_y
-        self.base_scale_z = self.params.base_scale_z
+        self.parents_base = self.params.parents_base
+        self.parents_tip = self.params.parents_tip
 
-        self.tip = self.params.tip
-        self.tip_scale_offset = self.params.tip_scale_offset
-        self.tip_scale_x = self.params.tip_scale_x
-        self.tip_scale_y = self.params.tip_scale_y
-        self.tip_scale_z = self.params.tip_scale_z
+        self.base_use_current_location = self.params.base_use_current_location
+        self.tip_use_current_location = self.params.tip_use_current_location
 
     ##############################
     # Controls & MCHs
@@ -1049,34 +966,39 @@ class AttachedBendyRig(HandleBendyRig, ScaleOffsetMixin):
     @stage.configure_bones
     def offset_scale_tweaks(self):
         tweaks = self.bones.ctrl.tweak
-        if self.real_bone(self.base) and self.base_scale_offset:
-            self.bone_scale_offset(
-                tweaks[0],
-                self.base,
-                self.base_scale_x,
-                self.base_scale_y,
-                self.base_scale_z
-            )
-        if self.real_bone(self.tip) and self.tip_scale_offset:
-            self.bone_scale_offset(
-                tweaks[-1],
-                self.tip,
-                self.tip_scale_x,
-                self.tip_scale_y,
-                self.tip_scale_z
-            )
+        for parent_base in self.parents_base:
+            if self.real_bone(parent_base.name) and parent_base.scale_offset:
+                self.bone_scale_offset(
+                    tweaks[0],
+                    parent_base.name,
+                    parent_base.scale_source_x,
+                    parent_base.scale_source_y,
+                    parent_base.scale_source_z
+                )
+        for parent_tip in self.parents_tip:
+            if self.real_bone(parent_tip.name) and parent_tip.scale_offset:
+                self.bone_scale_offset(
+                    tweaks[-1],
+                    parent_tip.name,
+                    parent_tip.scale_source_x,
+                    parent_tip.scale_source_y,
+                    parent_tip.scale_source_z
+                )
 
-    @stage.configure_bones
+    @stage.rig_bones
     def arma_constraint_tweak_mchs(self):
         mchs = self.bones.mch
         tweak_mchs = [mchs.base, mchs.tip]
-        subtargets = [self.base, self.tip]
-        scales = [self.base_scale_offset, self.tip_scale_offset]
-        for mch, subtarget, scale in zip(tweak_mchs, subtargets, scales):
-            if mch and self.real_bone(subtarget):
-                make_armature_constraint(self.obj, self.get_bone(mch), [subtarget])
-                if scale:
-                    self.make_constraint(mch, 'COPY_SCALE', self.root_bone)
+        parent_lists = [self.parents_base, self.parents_tip]
+        current_locs = [self.base_use_current_location, self.tip_use_current_location]
+
+        for mch, parent_list, current_loc in zip(tweak_mchs, parent_lists, current_locs):
+            if mch:
+                for parent in parent_list:
+                    if self.real_bone(parent.name):
+                        make_armature_constraint(self.obj, self.get_bone(mch), [subtarget])
+                        if scale:
+                            self.make_constraint(mch, 'COPY_SCALE', self.root_bone)
 
     @stage.apply_bones
     def reparent_tweak_mchs_tweaks(self):
@@ -1114,31 +1036,23 @@ class AttachedBendyRig(HandleBendyRig, ScaleOffsetMixin):
     ####################################################
     # UI
 
-    def base_ui(self, layout, params):
-        r = layout.row(align=True)
-        r.prop(params, 'base')
-        if params.base:
-            r.prop(params, 'base_scale_offset', text="", icon='CON_SIZELIKE')
-            if params.base_scale_offset:
+    def attached_ui(self, layout, params, parent_type='parents_base'):
+        box = layout.box()
+        for parent in getattr(self, parent_type):
+            r = box.row(align=True)
+            r.prop(parent, 'name')
+            r.prop(parent, 'scale_offset', text="", icon='CON_SIZELIKE')
+            if parent.scale_offset:
                 r = layout.row()
-                r.prop(params, 'base_scale_x', text="X")
-                r.prop(params, 'base_scale_y', text="Y")
-                r.prop(params, 'base_scale_z', text="Z")
+                r.prop(params, 'scale_source_x', text="X")
+                r.prop(params, 'scale_source_y', text="Y")
+                r.prop(params, 'scale_source_z', text="Z")
+        box.operator('pose.rigify_add_bendify_parent', text = "+ " + parent_type.replace("parents_", "").capitalize())
 
-    def tip_ui(self, layout, params):
-        r = layout.row(align=True)
-        r.prop(params, 'tip')
-        if params.tip:
-            r.prop(params, 'tip_scale_offset', text="", icon='CON_SIZELIKE')
-            if params.tip_scale_offset:
-                r = layout.row()
-                r.prop(params, 'tip_scale_x', text="X")
-                r.prop(params, 'tip_scale_y', text="Y")
-                r.prop(params, 'tip_scale_z', text="Z")
-
-    def attach_ui(self, layout, params):
-        self.base_ui(self, layout, params)
-        self.tip_ui(self, layout, params)
+    def parents_ui(self, layout, params):
+        col = layout.column()
+        self.attached_ui(self, col, params, 'parents_base')
+        self.attached_ui(self, col, params, 'parents_tip')
 
     ####################################################
     # SETTINGS
@@ -1147,78 +1061,21 @@ class AttachedBendyRig(HandleBendyRig, ScaleOffsetMixin):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.base = bpy.props.StringProperty(
-            name="Base Tweak Parent",
-            default="",
-            description="Set the parent for the first tweak"
+        params.parents_base = CollectionProperty(type=ArmaConstraintTargets, name="Base Parents")
+        #params.parents_curve = CollectionProperty(type=ArmaConstraintTargets, name="Curve Parents")
+        params.parents_tip = CollectionProperty(type=ArmaConstraintTargets, name="Tip Parents")
+
+        params.base_use_current_location = BoolProperty(
+            name="Base Current Location",
+            default=False,
+            description="Use the current bone location for the chain base"
         )
 
-        params.tip = bpy.props.StringProperty(
-            name="Tip Tweak Parent",
-            default="",
-            description="Set the parent for the last tweak"
+        params.tip_use_current_location = BoolProperty(
+            name="Tip Current Location",
+            default=False,
+            description="Use the current bone location for the chain tip"
         )
-
-        params.base_scale_offset = bpy.props.BoolProperty(
-            name="Copy Base Scale",
-            default=True,
-            description="Set scale offset for base tweak"
-        )
-
-        params.tip_scale_offset = bpy.props.BoolProperty(
-            name="Copy Tip Scale",
-            default=True,
-            description="Set scale offset for tip tweak"
-        )
-
-        params.base_scale_x = bpy.props.EnumProperty(
-            items=self.offset_axes,
-            name="X Source Axis",
-            default='X',
-            description="Source axis for X scale base offset"
-        )
-
-        params.base_scale_y = bpy.props.EnumProperty(
-            items=self.offset_axes,
-            name="Y Source Axis",
-            default='Y',
-            description="Source axis for Y scale base offset"
-        )
-
-        params.base_scale_z = bpy.props.EnumProperty(
-            items=self.offset_axes,
-            name="Z Source Axis",
-            default='Z',
-            description="Source axis for Z scale base offset"
-        )
-
-        params.tip_scale_x = bpy.props.EnumProperty(
-            items=self.offset_axes,
-            name="X Source Axis",
-            default='X',
-            description="Source axis for X scale tip offset"
-        )
-
-        params.tip_scale_y = bpy.props.EnumProperty(
-            items=self.offset_axes,
-            name="Y Source Axis",
-            default='Y',
-            description="Source axis for Y scale tip offset"
-        )
-
-        params.tip_scale_z = bpy.props.EnumProperty(
-            items=self.offset_axes,
-            name="Z Source Axis",
-            default='Z',
-            description="Source axis for Z scale tip offset"
-        )
-
-
-    @classmethod
-    def parameters_ui(self, layout, params):
-        self.connecting_ui(self, layout, params)
-        super().parameters_ui(layout, params)
-
 
 # Use this OR "Attached"
 
@@ -1381,7 +1238,7 @@ class ConnectingBendyRig(AttachedBendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.base_type = bpy.props.EnumProperty(
+        params.base_type = EnumProperty(
             items=[
                 ('NONE', "Default", "Default"),
                 ('PARENT', "To Parent", "Connect first tweak to parent"),
@@ -1393,13 +1250,13 @@ class ConnectingBendyRig(AttachedBendyRig):
             description="Connection point for the first tweak of the B-Bone chain"
         )
 
-        params.base_connect = bpy.props.BoolProperty(
+        params.base_connect = BoolProperty(
             name="Connect First",
             default=True,
             description="Move first tweak to its parent"
         )
 
-        params.base_align = bpy.props.BoolProperty(
+        params.base_align = BoolProperty(
             name="Align First",
             default=True,
             description="Align first tweak to its parent for a smooth curve"

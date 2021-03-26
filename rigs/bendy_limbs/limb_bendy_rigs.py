@@ -1,24 +1,4 @@
-#====================== BEGIN GPL LICENSE BLOCK ======================
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-#======================= END GPL LICENSE BLOCK ========================
-
-# <pep8 compliant>
-
-import bpy
+from bpy.props import *
 
 from rigify.utils.bones import set_bone_widget_transform
 from rigify.utils.layers import ControlLayersOption
@@ -601,51 +581,51 @@ class BaseLimbBendyRig(BaseLimbRig):
             ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
         )
 
-        params.rotation_mode_ik = bpy.props.EnumProperty(
+        params.rotation_mode_ik = EnumProperty(
             name        = 'Default IK Controller Rotation Mode',
             items       = rotation_modes,
             default     = 'QUATERNION',
             description = 'Default rotation mode for IK control bones'
         )
 
-        params.rotation_mode_tweak = bpy.props.EnumProperty(
+        params.rotation_mode_tweak = EnumProperty(
             name        = 'Default Tweak Controller Rotation Mode',
             items       = rotation_modes,
             default     = 'ZXY',
             description = 'Default rotation mode for tweak control bones'
         )
 
-        params.tweak_align_default = bpy.props.BoolProperty(
+        params.tweak_align_default = BoolProperty(
             name='Align Joints',
             default=True,
             description='Align joint tweaks to interpolate between limb segments. This only affects the default, property can always be animated.'
         )
 
-        params.tweak_align_panel = bpy.props.BoolProperty(
+        params.tweak_align_panel = BoolProperty(
             name='Align Joints Panel UI',
             default=False,
             description='Add panel to control joint interpolation to the UI.'
         )
 
-        params.ease_in = bpy.props.BoolProperty(
+        params.ease_in = BoolProperty(
             name='Bend In',
             default=False,
             description='Make incoming joint bendy by default. Sets default ease for joint tweak to 1.'
         )
 
-        params.ease_joints = bpy.props.BoolProperty(
+        params.ease_joints = BoolProperty(
             name='Bend Joints',
             default=False,
             description='Make main joints bendy by default. Sets default ease for joint tweaks to 1.'
         )
 
-        params.ease_out = bpy.props.BoolProperty(
+        params.ease_out = BoolProperty(
             name='Bend Out',
             default=False,
             description='Make outgoing joint bendy by default. Sets default ease for joint tweak to 1.'
         )
 
-        params.limb_volume_deform_default = bpy.props.FloatProperty(
+        params.limb_volume_deform_default = FloatProperty(
             name="Deform Volume Variation Default",
             default=1.0,
             soft_min=0.0,
@@ -653,7 +633,7 @@ class BaseLimbBendyRig(BaseLimbRig):
             description="Default value for deform bone chain stretch volume variation"
         )
 
-        params.limb_volume_deform_panel = bpy.props.BoolProperty(
+        params.limb_volume_deform_panel = BoolProperty(
             name="Deform Volume Variation Panel",
             default=False,
             description="Add panel to control volume variation to the UI"

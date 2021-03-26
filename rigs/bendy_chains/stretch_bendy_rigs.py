@@ -1,24 +1,5 @@
-#====================== BEGIN GPL LICENSE BLOCK ======================
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-#======================= END GPL LICENSE BLOCK ========================
+from bpy.props import *
 
-# <pep8 compliant>
-
-import bpy
 from itertools import count
 
 from rigify.base_rig import stage
@@ -203,7 +184,7 @@ class StretchBendyRig(HandleBendyRig):
 
         super().add_parameters(params)
 
-        params.volume_stretch_default = bpy.props.FloatProperty(
+        params.volume_stretch_default = FloatProperty(
             name="Stretch Volume Variation Default",
             default=1.0,
             soft_min=0.0,
@@ -211,7 +192,7 @@ class StretchBendyRig(HandleBendyRig):
             description="Default value for stretch volume variation"
         )
 
-        params.volume_stretch_panel = bpy.props.BoolProperty(
+        params.volume_stretch_panel = BoolProperty(
             name="Stretch Volume Variation Panel",
             default=False,
             description="Add panel to control volume variation to the UI"
@@ -407,7 +388,7 @@ class ComplexStretchBendyRig(SingleSegmentStretchBendyRig, ComplexBendyRig):
 
 class HarmonicScaleStretchRig(SingleSegmentStretchBendyRig):
     """
-    Stretchy rig with reduced complexity for single segment
+    Stretchy rig with scale falloff from main controllers
     """
 
     def initialize(self):
@@ -469,7 +450,7 @@ class HarmonicScaleStretchRig(SingleSegmentStretchBendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.tweak_scale_offset = bpy.props.BoolProperty(
+        params.tweak_scale_offset = BoolProperty(
             name="Main Controls Scale Tweaks",
             default=True,
             description="Offset tweak X and Z scale by stretch main controls scale"
@@ -528,13 +509,13 @@ class StraightStretchBendyRig(SingleSegmentStretchBendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.straight = bpy.props.BoolProperty(
+        params.straight = BoolProperty(
             name="Straighten CTRLs",
             default=False,
             description="Align stretch controls to form a straight line by default"
         )
 
-        params.straight_orientation = bpy.props.EnumProperty(
+        params.straight_orientation = EnumProperty(
             items=[
                 ('FIRST', "Use First", "Use First"),
                 ('LAST', "Use Last", "Use Last"),
@@ -729,66 +710,66 @@ class ParentedStretchBendyRig(SingleSegmentStretchBendyRig, ScaleOffsetMixin):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.parent_start = bpy.props.StringProperty(
+        params.parent_start = StringProperty(
             name="Start Parent",
             default="",
             description="Set the parent for the start handle of the stretchy control curve"
         )
 
-        params.parent_end = bpy.props.StringProperty(
+        params.parent_end = StringProperty(
             name="End Parent",
             default="",
             description="Set the parent for the end handle of the stretchy control curve"
         )
 
-        params.parent_start_scale_offset = bpy.props.BoolProperty(
+        params.parent_start_scale_offset = BoolProperty(
             name="Copy Start Parent Scale",
             default=False,
             description="Set scale offset for start controller"
         )
 
-        params.parent_end_scale_offset = bpy.props.BoolProperty(
+        params.parent_end_scale_offset = BoolProperty(
             name="Copy End Parent Scale",
             default=False,
             description="Set scale offset for end controller"
         )
 
-        params.parent_start_scale_x = bpy.props.EnumProperty(
+        params.parent_start_scale_x = EnumProperty(
             items=self.offset_axes,
             name="X Source Axis",
             default='X',
             description="Source axis for X scale start offset"
         )
 
-        params.parent_start_scale_y = bpy.props.EnumProperty(
+        params.parent_start_scale_y = EnumProperty(
             items=self.offset_axes,
             name="Y Source Axis",
             default='Y',
             description="Source axis for Y scale start offset"
         )
 
-        params.parent_start_scale_z = bpy.props.EnumProperty(
+        params.parent_start_scale_z = EnumProperty(
             items=self.offset_axes,
             name="Z Source Axis",
             default='Z',
             description="Source axis for Z scale start offset"
         )
 
-        params.parent_end_scale_x = bpy.props.EnumProperty(
+        params.parent_end_scale_x = EnumProperty(
             items=self.offset_axes,
             name="X Source Axis",
             default='X',
             description="Source axis for X scale end offset"
         )
 
-        params.parent_end_scale_y = bpy.props.EnumProperty(
+        params.parent_end_scale_y = EnumProperty(
             items=self.offset_axes,
             name="Y Source Axis",
             default='Y',
             description="Source axis for Y scale end offset"
         )
 
-        params.parent_end_scale_z = bpy.props.EnumProperty(
+        params.parent_end_scale_z = EnumProperty(
             items=self.offset_axes,
             name="Z Source Axis",
             default='Z',
@@ -847,20 +828,20 @@ class ScalingStretchBendyRig(SingleSegmentStretchBendyRig, ScaleOffsetMixin):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.deform_scale = bpy.props.StringProperty(
+        params.deform_scale = StringProperty(
             name="Volume Copy",
             default="",
             description="Copy X/Y scale from this bone"
         )
 
-        params.deform_scale_x = bpy.props.EnumProperty(
+        params.deform_scale_x = EnumProperty(
             items=self.offset_axes,
             name="X Source Axis",
             default='X',
             description="Source axis for X scale deform offset"
         )
 
-        params.deform_scale_z = bpy.props.EnumProperty(
+        params.deform_scale_z = EnumProperty(
             items=self.offset_axes,
             name="Z Source Axis",
             default='Z',
@@ -973,8 +954,8 @@ class EasingStretchBendyRig(ArmatureStretchBendyRig):
     def drivers_bend_mch_chain(self):
         if self.bend and len(self.bones.org) >= len(self.bones.ctrl.stretch):
             ctrls = self.bones.ctrl.stretch
-            for args in zip(self.bones.mch.bend, ctrls, ctrls[1:]):
-                self.drivers_bbone_ease(*args)
+            for mch, handle_in, handle_out in zip(self.bones.mch.bend, ctrls, ctrls[1:]):
+                self.driver_bbone_ease(mch, [handle_in], [handle_out])
 
     ####################################################
     # Armature MCHs
@@ -1009,13 +990,13 @@ class EasingStretchBendyRig(ArmatureStretchBendyRig):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.bend = bpy.props.BoolProperty(
+        params.bend = BoolProperty(
             name="Bend Between CTRLs",
             default=True,
             description="Use a bendy control curve between start and end handles"
         )
 
-        params.bend_easein = bpy.props.FloatProperty(
+        params.bend_easein = FloatProperty(
             name="Ease In",
             default=1.0,
             soft_min=0.0,
@@ -1023,7 +1004,7 @@ class EasingStretchBendyRig(ArmatureStretchBendyRig):
             description="Easing in for the control curve"
         )
 
-        params.bend_easeout = bpy.props.FloatProperty(
+        params.bend_easeout = FloatProperty(
             name="Ease Out",
             default=1.0,
             soft_min=0.0,
@@ -1326,38 +1307,38 @@ class CurvyStretchBendyRig(EasingStretchBendyRig, ScaleOffsetMixin):
     def add_parameters(self, params):
         super().add_parameters(params)
 
-        params.curve_control = bpy.props.BoolProperty(
+        params.curve_control = BoolProperty(
             name="Add Curve Control",
             default=False,
             description="Add a controller to alter the curvature from the center"
         )
 
-        params.curve_parent = bpy.props.StringProperty(
+        params.curve_parent = StringProperty(
             name="Parent",
             default="",
             description="Switch parenting to this bone"
         )
 
-        params.curve_location = bpy.props.StringProperty(
+        params.curve_location = StringProperty(
             name="Location",
             default="",
             description="Move curve control to this bone"
         )
 
-        params.curve_position = bpy.props.IntProperty(
+        params.curve_position = IntProperty(
             name="Curve Position",
             default=1,
             min=1,
             description="Position curve control at this segment"
         )
 
-        params.curve_center = bpy.props.BoolProperty(
+        params.curve_center = BoolProperty(
             name="Curve Center",
             default=False,
             description="Position curve control at the segment center"
         )
 
-        params.curve_control_easein = bpy.props.FloatProperty(
+        params.curve_control_easein = FloatProperty(
             name="Ease to End",
             default=1.0,
             soft_min=0.0,
@@ -1365,7 +1346,7 @@ class CurvyStretchBendyRig(EasingStretchBendyRig, ScaleOffsetMixin):
             description="B-Bone ease going out of curve control"
         )
 
-        params.curve_control_easeout = bpy.props.FloatProperty(
+        params.curve_control_easeout = FloatProperty(
             name="Ease from Start",
             default=1.0,
             soft_min=0.0,
@@ -1373,27 +1354,27 @@ class CurvyStretchBendyRig(EasingStretchBendyRig, ScaleOffsetMixin):
             description="B-Bone ease going into curve control"
         )
 
-        params.curve_parent_scale_offset = bpy.props.BoolProperty(
+        params.curve_parent_scale_offset = BoolProperty(
             name="Copy Curve Parent Scale",
             default=False,
             description="Set scale offset for curve controller"
         )
 
-        params.curve_parent_scale_x = bpy.props.EnumProperty(
+        params.curve_parent_scale_x = EnumProperty(
             items=self.offset_axes,
             name="X Source Axis",
             default='X',
             description="Source axis for X scale curve offset"
         )
 
-        params.curve_parent_scale_y = bpy.props.EnumProperty(
+        params.curve_parent_scale_y = EnumProperty(
             items=self.offset_axes,
             name="Y Source Axis",
             default='Y',
             description="Source axis for Y scale curve offset"
         )
 
-        params.curve_parent_scale_z = bpy.props.EnumProperty(
+        params.curve_parent_scale_z = EnumProperty(
             items=self.offset_axes,
             name="Z Source Axis",
             default='Z',

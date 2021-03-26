@@ -14,7 +14,8 @@ from .tools_ui import *
 from .widgets_ops import *
 from .widgets_ui import *
 from .rigify_ui import *
-from .props import BendifySceneSettings
+from .props import BendifySceneSettings, ArmaConstraintTargets
+
 
 classes = (
     BENDIFY_OT_AlmToggle,
@@ -47,7 +48,10 @@ classes = (
     BENDIFY_PT_BendifyToolsObject,
     BENDIFY_PT_BendifyToolsWeightPaint,
     BENDIFY_PT_BendifyWidgets,
+    BENDIFY_PT_BoneParents,
+    BONE_PT_BoneParents,
     BendifySceneSettings,
+    ArmaConstraintTargets
 )
 
 def register():

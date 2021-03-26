@@ -1,4 +1,7 @@
-import bpy
+from bpy import ops
+from bpy.props import *
+from bpy.types import Operator
+
 
 class AlmMixIn():
     """Mix-in class for armature layer manager objects, providing poll and armature identification"""
@@ -67,7 +70,7 @@ class AlmMixIn():
         elif act and act.type == 'ARMATURE':
             return act
 
-class BENDIFY_OT_AlmToggle(bpy.types.Operator, AlmMixIn):
+class BENDIFY_OT_AlmToggle(Operator, AlmMixIn):
     """Toggle armature layer visibility for all layers"""
     bl_idname = 'view3d.armature_layer_manager_toggle'
     bl_label = "Armature Layers Toggle"
@@ -86,15 +89,15 @@ class BENDIFY_OT_AlmToggle(bpy.types.Operator, AlmMixIn):
             self.bendify(context).alm_layers = 32 * [False]
         return {"FINISHED"}
 
-class BENDIFY_OT_AlmSelect(bpy.types.Operator, AlmMixIn):
+class BENDIFY_OT_AlmSelect(Operator, AlmMixIn):
     """(De-)Select all bones in layer according to the chosen mode"""
     bl_idname = 'view3d.armature_layer_manager_select'
     bl_label = "Select Layer Bones"
     bl_options = {'REGISTER', 'UNDO'}
     
-    layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
-    select: bpy.props.BoolProperty(name="Select", default=True)
-    new: bpy.props.BoolProperty(name="New Selection", default=True)
+    layer: IntProperty(name="Layer", min=0, max=31)
+    select: BoolProperty(name="Select", default=True)
+    new: BoolProperty(name="New Selection", default=True)
 
     @classmethod
     def poll(self, context):
@@ -121,13 +124,13 @@ class BENDIFY_OT_AlmSelect(bpy.types.Operator, AlmMixIn):
 
         return {"FINISHED"}
 
-class BENDIFY_OT_AlmLock(bpy.types.Operator, AlmMixIn):
+class BENDIFY_OT_AlmLock(Operator, AlmMixIn):
     """Lock all bones in one specific layer"""
     bl_idname = 'view3d.armature_layer_manager_lock'
     bl_label = "Lock All Bones In Layer"
     bl_options = {'REGISTER', 'UNDO'}
     
-    layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
+    layer: IntProperty(name="Layer", min=0, max=31)
 
     @classmethod
     def poll(self, context):
@@ -139,7 +142,7 @@ class BENDIFY_OT_AlmLock(bpy.types.Operator, AlmMixIn):
         mode = False
         if context.mode == 'EDIT_ARMATURE':
             mode = True
-            bpy.ops.object.mode_set(mode='POSE')
+            ops.object.mode_set(mode='POSE')
         for bone in obj.data.bones:
             if bone.layers[self.layer]:
                 if bone.hide_select:
@@ -152,17 +155,17 @@ class BENDIFY_OT_AlmLock(bpy.types.Operator, AlmMixIn):
                     bone.select_tail = False
                 bone.hide_select = lock
         if mode:
-            bpy.ops.object.mode_set(mode='EDIT')
+            ops.object.mode_set(mode='EDIT')
         return {"FINISHED"}
 
-class BENDIFY_OT_AlmAdd(bpy.types.Operator, AlmMixIn):
+class BENDIFY_OT_AlmAdd(Operator, AlmMixIn):
     """Add selection to specified layer"""
     bl_idname = 'view3d.armature_layer_manager_add'
     bl_label = "Add Bones To Layer"
     bl_options = {'REGISTER', 'UNDO'}
     
-    layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
-    move: bpy.props.BoolProperty(name="Move", default=False)
+    layer: IntProperty(name="Layer", min=0, max=31)
+    move: BoolProperty(name="Move", default=False)
     
     @classmethod
     def poll(self, context):
@@ -182,13 +185,13 @@ class BENDIFY_OT_AlmAdd(bpy.types.Operator, AlmMixIn):
                         bone.layers[i] = False
         return {"FINISHED"}
 
-class BENDIFY_OT_AlmSolo(bpy.types.Operator, AlmMixIn):
+class BENDIFY_OT_AlmSolo(Operator, AlmMixIn):
     """Set armature layer to solo"""
     bl_idname = 'view3d.armature_layer_manager_solo'
     bl_label = "Solo Layer"
     bl_options = {'REGISTER', 'UNDO'}
     
-    layer: bpy.props.IntProperty(name="Layer", min=0, max=31)
+    layer: IntProperty(name="Layer", min=0, max=31)
 
     @classmethod
     def poll(self, context):
