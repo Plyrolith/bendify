@@ -20,58 +20,35 @@
 
 import bpy
 
-from itertools import count
-
-from rigify.utils.bones import put_bone
 from rigify.utils.layers import ControlLayersOption
-from rigify.utils.naming import make_derived_name
-from rigify.utils.misc import map_list
 from rigify.base_rig import stage
-from rigify.rigs.widgets import create_gear_widget
 
 from rigify.rigs.spines.basic_spine import Rig as SpineRig
 
-from .bendy_chain_rigs import BaseBendyRig
+from .chain_bendy_rigs import ChainBendyRig
 
 from ...utils.misc import threewise_nozip
 
 
-class Rig(SpineRig, BaseBendyRig):
+class Rig(SpineRig, ChainBendyRig):
     """
     Bendy spine rig with fixed pivot, hip/chest controls and tweaks.
     """
 
     def initialize(self):
-        self.rotation_mode_end = self.params.rotation_mode_end
         super().initialize()
-        
-        #self.stretch_orgs_default = 0.0
+        ChainBendyRig.initialize(self)
+        self.rotation_mode_end = self.params.rotation_mode_end
+        self.org_transform = 'FK'
 
     ####################################################
-    # Volume control
+    # Master control bone
 
     @stage.generate_bones
-    def make_volume_control(self):
-        org = self.bones.org[self.pivot_pos]
-        self.bones.ctrl.volume = self.copy_bone(org, 'spine_volume')
-        self.copy_scale_bone = self.bones.ctrl.volume
-
-    @stage.parent_bones
-    def parent_volume_control(self):
-        self.set_bone_parent(self.bones.ctrl.volume, self.bones.ctrl.master)
-
-    @stage.configure_bones
-    def configure_volume_control(self):
-        bone = self.get_bone(self.bones.ctrl.volume)
-        bone.lock_location = (True, True, True)
-        bone.lock_rotation = (True, True, True)
-        bone.lock_rotation_w = True
-        bone.lock_scale = (False, True, False)
-
-    @stage.generate_widgets
-    def make_volume_control_widget(self):
-        bone = self.bones.ctrl.volume
-        create_gear_widget(self.obj, bone, size=4)
+    def make_master_control(self):
+        # Set master control as default prop bone
+        super().make_master_control()
+        self.default_prop_bone = self.bones.ctrl.master
 
     ####################################################
     # Main control bones
@@ -110,22 +87,27 @@ class Rig(SpineRig, BaseBendyRig):
 
     @stage.parent_bones
     def parent_tweak_chain(self):
-        BaseBendyRig.parent_tweak_chain(self)
+        ChainBendyRig.parent_tweak_chain(self)
 
     def configure_tweak_bone(self, i, tweak):
-        BaseBendyRig.configure_tweak_bone(self, i, tweak)
+        ChainBendyRig.configure_tweak_bone(self, i, tweak)
 
     ####################################################
     # Deform bones
 
+    """
+    @stage.parent_bones
+    def parent_deform_chain(self):
+        ctrls = self.bones.ctrl
+        for deform, fk in zip(self.bones.deform, ctrls.fk.hips + ctrls.fk.chest):
+            self.set_bone_parent(deform, fk, use_connect=False)
+    """
+
     @stage.rig_bones
     def rig_deform_chain(self):
-        ctrl = self.bones.ctrl
-        for args in zip(count(0), self.bones.deform, ctrl.tweak, ctrl.tweak[1:], ctrl.fk.hips + ctrl.fk.chest):
-            self.rig_deform_bone(*args)
-
-    def rig_deform_bone(self, i, deform, tweak, next_tweak, fk):
-        BaseBendyRig.rig_deform_bone(self, i, deform, tweak, next_tweak, fk)
+        ctrls = self.bones.ctrl
+        for args in zip(self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk.hips + ctrls.fk.chest):
+            ChainBendyRig.rig_deform_bone(self, *args)
 
     @stage.configure_bones
     def configure_bbone_chain(self):
@@ -136,55 +118,49 @@ class Rig(SpineRig, BaseBendyRig):
 
     @stage.parent_bones
     def parent_org_chain(self):
-        ctrl = self.bones.ctrl
         orgs = self.bones.org
-        for fk, org in zip(ctrl.fk.hips + ctrl.fk.chest, orgs):
+        fks = self.bones.ctrl.fk
+        for org, fk in zip(orgs, fks.hips + fks.chest):
             self.set_bone_parent(org, fk)
+        
+    ####################################################
+    # UI
 
-    @stage.rig_bones
-    def rig_org_chain(self):
-        fk = self.bones.ctrl.fk
-        orgs = self.bones.org
-        for args in zip(count(0), orgs, fk.hips + fk.chest):
-            self.rig_org_bone(*args)
-
-    def rig_org_bone(self, i, org, target):
-        BaseBendyRig.rig_org_bone(self, i, org, target)
+    def pivot_ui(self, layout, params):
+        layout.row().prop(params, 'make_custom_pivot', toggle=True)
+        layout.row().prop(params, 'pivot_pos', text="Pivot Position")
+    
+    def chest_hips_ui(self, layout, params):
+        layout.row().prop(params, 'rotation_mode_end', text="Chest & Hips")
+    
 
     ####################################################
     # SETTINGS
 
     @classmethod
     def add_parameters(self, params):
-        # Added rotation mode
-
         super().add_parameters(params)
 
-        rotation_modes = (
-            ('QUATERNION', 'Quaternion (WXYZ)', 'Quaternion (WXYZ)'),
-            ('XYZ', 'XYZ', 'XYZ'),
-            ('XZY', 'XZY', 'XZY'), 
-            ('YXZ', 'YXZ', 'YXZ'),
-            ('YZX', 'YZX', 'YZX'),
-            ('ZXY', 'ZXY', 'ZXY'),
-            ('ZYX', 'ZYX', 'ZYX'),
-            ('AXIS_ANGLE', 'Axis Angle', 'Axis Angle') 
-        )
-
         params.rotation_mode_end = bpy.props.EnumProperty(
-            name        = 'Default Chest & Hip Rotation Mode',
-            items       = rotation_modes,
-            default     = 'QUATERNION',
-            description = 'Default rotation mode for chest and hip control bones'
+            name='Default Chest & Hip Rotation Mode',
+            items=self.rotation_modes,
+            default='QUATERNION',
+            description='Default rotation mode for chest and hip control bones'
         )
     
     @classmethod
     def parameters_ui(self, layout, params):
-        layout.row().prop(params, 'make_custom_pivot')
-        layout.row().prop(params, 'pivot_pos')
-        layout.row().prop(params, 'rotation_mode_end', text="Chest & Hips")
-
-        BaseBendyRig.parameters_ui(layout, params)
+        box = layout.box()
+        self.pivot_ui(self, box, params)
+        self.chest_hips_ui(self, box, params)
+        layout.row().prop(params, 'show_advanced')
+        if params.show_advanced:
+            box = layout.box()
+            #self.complex_stretch_ui(self, box, params)
+            self.rotation_mode_tweak_ui(self, box, params)
+            self.volume_ui(self, box, params)
+        box = layout.box()
+        self.bbones_ui(self, box, params)
         ControlLayersOption.FK.parameters_ui(layout, params)
 
 

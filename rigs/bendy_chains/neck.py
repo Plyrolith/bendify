@@ -22,57 +22,53 @@ import bpy
 
 from itertools import count
 
-from rigify.utils.misc import map_list
+from rigify.utils.bones import set_bone_widget_transform, is_same_position
 from rigify.utils.layers import ControlLayersOption
+from rigify.utils.misc import map_list
+from rigify.utils.naming import make_derived_name
 from rigify.utils.widgets_basic import create_circle_widget
 from rigify.utils.widgets_special import create_neck_tweak_widget
 from rigify.base_rig import stage
 from rigify.rigs.spines.super_head import Rig as SuperHeadRig
+from rigify.rigs.widgets import create_gear_widget
 
-from .bendy_chain_rigs import ConnectingBendyRig
+from .chain_bendy_rigs import ConnectingChainBendyRig
 
+from ...utils.bones import align_bone, real_bone
 from ...utils.misc import threewise_nozip
 
 
-class Rig(SuperHeadRig, ConnectingBendyRig):
+class Rig(SuperHeadRig, ConnectingChainBendyRig):
     """
     Head rig with long bendy neck support and connect option.
     """
 
-
     def initialize(self):
-        # Don't use basic connection, bendy init, neck checks
+        '''Don't use basic connection; bendy init, neck checks'''
+        super().initialize()
         self.create_head_def = self.params.create_head_def
+        self.spine_end_to_neck = self.params.spine_end_to_neck
+
+        # Deactivate
         self.use_connect_chain = False
         self.connected_tweak = None
+        self.tip = None
 
-        ConnectingBendyRig.initialize(self)
+        ConnectingChainBendyRig.initialize(self)
 
+        self.base_mch = None
         self.long_neck = len(self.bones.org) > 3
         self.has_neck = len(self.bones.org) > 1
         self.rotation_bones = []
-    
-    def prepare_bones(self):
-        ConnectingBendyRig.prepare_bones(self)
+
+        self.bbone_handles = 'TANGENT'
+        self.org_transform = 'DEFORM'
 
     ####################################################
-    # Utilities
-
-    def get_parent_master(self, default_bone):
-        if self.incoming_tweak and 'master' in self.rigify_parent.bones.ctrl:
-            return self.rigify_parent.bones.ctrl.master
-        else:
-            return default_bone
-
-    ####################################################
-    # Main control bones   
-
-    @stage.parent_bones
-    def parent_master_control(self):
-        self.set_bone_parent(self.bones.ctrl.master, self.bones.mch.rot_neck)
+    # Main control bones  
 
     def make_neck_widget(self, ctrl):
-        # Widget based on orgs instead of chain mch
+        '''Widget based on orgs instead of chain mch'''
         radius = 1/max(1, len(self.bones.org[1:-1]))
 
         create_circle_widget(
@@ -86,57 +82,59 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
 
     def check_mch_parents(self):
         mch = self.bones.mch
-        ctrl = self.bones.ctrl
+        ctrls = self.bones.ctrl
+        orgs = self.bones.org
         if self.long_neck:
-            parents = [mch.tweak[0], *mch.chain, ctrl.head]
-        elif self.has_neck and len(mch) == 2:
-            parents = [ctrl.neck, mch.stretch, ctrl.head]
-        elif self.has_neck:
-            parents = [ctrl.neck, ctrl.head]
+            parents = [mch.tweak[0], *mch.chain, ctrls.head, ctrls.head]
+        elif self.has_neck and len(orgs) == 3:
+            parents = [ctrls.neck, mch.stretch, ctrls.head, ctrls.head]
+        elif self.has_neck and len(orgs) == 2:
+            parents = [ctrls.neck, ctrls.head, ctrls.head]
         else:
-            parents = ctrl.head
+            parents = [ctrls.head, ctrls.head]
         return parents
 
     def check_mch_targets(self):
-        return threewise_nozip(self.check_mch_parents())
+        return threewise_nozip(self.check_mch_parents()[:-1])
 
     ####################################################
-    # Incoming Tweak
+    # Attach Spine End to Neck
+
+    @stage.parent_bones
+    def check_base_tweak_mch(self):
+        parent_tweaks = self.attribute_return(['rigify_parent', 'bones', 'mch', 'tweak'], True)
+        if self.attribute_return(['rigify_parent', 'org_transform']) == 'FK' and self.spine_end_to_neck \
+        and self.base_connect and self.real_bone(self.base) and self.get_bone_parent(self.base) in parent_tweaks:
+            self.base_mch = self.get_bone_parent(self.base)
 
     @stage.apply_bones
-    def apply_tweak_incoming(self):
-        if self.incoming_tweak and not self.incoming_tweak_mch:
-            self.set_bone_parent(self.incoming_tweak, self.bones.ctrl.neck)
+    def parent_base_tweak(self):
+        if self.attribute_return(['rigify_parent', 'org_transform']) == 'FK' and self.spine_end_to_neck \
+        and self.real_bone(self.base) and self.get_bone_parent(self.base) and not self.base_mch:
+            self.set_bone_parent(self.base, self.bones.ctrl.neck if self.has_neck else self.bones.ctrl.head)
     
-    @stage.rig_bones
-    def rig_mch_tweak_incoming(self):
-        if self.incoming_tweak:
-            if self.incoming_tweak_mch:
-                self.make_constraint(self.incoming_tweak_mch, 'COPY_LOCATION', self.bones.ctrl.neck)
-            else:
-                pass
+    @stage.finalize
+    def copy_location_base_tweak_mch(self):
+        if self.base_mch and self.has_neck and is_same_position(self.obj, self.base_mch, self.bones.ctrl.neck):
+            self.make_constraint(self.base_mch, 'COPY_LOCATION', self.bones.ctrl.neck)
+
 
     ####################################################
     # Tweak MCH chain
-    
-    @stage.parent_bones
-    def parent_tweak_mch_chain(self):
-        mch = self.bones.mch
-        parents = self.check_mch_parents()
-
-        for args in zip(count(0), mch.tweak, parents + [self.bones.ctrl.head]):
-            self.parent_tweak_mch_bone(*args)
 
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
+        mch = self.bones.mch
         if self.long_neck:
-            ConnectingBendyRig.rig_tweak_mch_chain(self)
-        elif self.has_neck:
-            mch = self.bones.mch
-            ctrl = self.bones.ctrl
-            for mch_tweak in mch.tweak:
-                self.make_constraint(mch_tweak, 'COPY_SCALE', ctrl.master, use_make_uniform=True)
+            targets = self.check_mch_targets()
 
+            for i, mch_tweak, p, c, n in zip(count(0), mch.tweak[:-1], *targets):
+                self.rig_tweak_mch_bone(i, mch_tweak, self.bones.ctrl.neck, p, c, n)
+        
+        elif self.has_neck:
+            for mch_tweak in mch.tweak[:-1]:
+                self.make_constraint(mch_tweak, 'COPY_SCALE', self.bones.ctrl.neck, use_make_uniform=True)
+    
     ####################################################
     # MCH IK chain for the long neck
     
@@ -153,39 +151,36 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     def make_mch_chain(self):
         # Chain only for long neck
         if self.long_neck:
-            super().make_mch_chain()
+            ConnectingChainBendyRig.make_mch_chain(self)
 
     @stage.parent_bones
     def align_mch_chain(self):
         # Chain only for long neck
         if self.long_neck:
-            super().align_mch_chain()
+            ConnectingChainBendyRig.align_mch_chain(self)
 
     @stage.parent_bones
     def parent_mch_chain(self):
         # Chain only for long neck
         if self.long_neck:
-            super().parent_mch_chain()
+            ConnectingChainBendyRig.parent_mch_chain(self)
     
     @stage.rig_bones
     def rig_mch_chain(self):
         # Chain only for long neck
         if self.long_neck:
-            super().rig_mch_chain()
+            ConnectingChainBendyRig.rig_mch_chain(self)
 
     ####################################################
     # Tweak chain
  
     @stage.generate_bones
     def make_tweak_chain(self):
-        ConnectingBendyRig.make_tweak_chain(self)
-    #    # No tweak for head tip
-    #    orgs = self.bones.org
-    #    self.bones.ctrl.tweak = map_list(self.make_tweak_bone, count(0), orgs)
+        ConnectingChainBendyRig.make_tweak_chain(self)
 
     @stage.parent_bones
     def parent_tweak_chain(self):
-        ConnectingBendyRig.parent_tweak_chain(self)
+        ConnectingChainBendyRig.parent_tweak_chain(self)
     
     @stage.parent_bones
     def align_tweak_chain(self):
@@ -194,57 +189,50 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
             length = self.get_bone(tweak[-3]).length
             self.get_bone(tweak[-1]).length = length
             self.get_bone(tweak[-2]).length = length
-        ConnectingBendyRig.align_tweak_chain(self)
+        ConnectingChainBendyRig.align_tweak_chain(self)
 
     @stage.parent_bones
     def resize_last_tweak(self):
-        ctrl = self.bones.ctrl
-        last = self.get_bone(ctrl.tweak[-1])
-        if len(ctrl.tweak) > 2:
-            last.length = self.get_bone(ctrl.tweak[-2]).length
+        ctrls = self.bones.ctrl
+        last = self.get_bone(ctrls.tweak[-1])
+        if len(ctrls.tweak) > 2:
+            last.length = self.get_bone(ctrls.tweak[-2]).length
         else:
             last.length /= 12
 
     def configure_tweak_bone(self, i, tweak):
-        ConnectingBendyRig.configure_tweak_bone(self, i, tweak)
+        ConnectingChainBendyRig.configure_tweak_bone(self, i, tweak)
 
     @stage.rig_bones
     def generate_neck_tweak_widget(self):
         # Generate the widget early to override connected parent
         if self.long_neck:
-            bone = self.incoming_tweak or self.bones.ctrl.tweak[0]
+            bone = self.base if self.base_type == 'TWEAK' and self.real_bone(self.base) else self.bones.ctrl.tweak[0]
             create_neck_tweak_widget(self.obj, bone, size=1.0)
 
     ##############################
     # ORG chain
 
     @stage.parent_bones
-    def parent_org_chain(self):
-        ConnectingBendyRig.parent_org_chain(self)
-        self.set_bone_parent(self.bones.org[-1], self.bones.ctrl.head)
-
-        
+    def parent_org_chain(self):  
+        ConnectingChainBendyRig.parent_org_chain(self)
+                
     @stage.rig_bones
-    def rig_org_chain(self):
-        ctrl = self.bones.ctrl
-        
-        self.rig_org_head_bone(self.bones.org[-1], ctrl.tweak[-2], ctrl.tweak[-1])
+    def rig_org_chain(self): 
+        # Head ORG
+        ctrls = self.bones.ctrl
+        last_org = self.bones.org[-1]
+        self.make_constraint(last_org, 'COPY_TRANSFORMS', ctrls.tweak[-2])
+        self.make_constraint(last_org, 'COPY_SCALE', ctrls.head)
+        self.make_constraint(last_org, 'DAMPED_TRACK', ctrls.tweak[-2])
+        stretch = self.make_constraint(last_org, 'STRETCH_TO', ctrls.tweak[-1])
+        self.make_driver(stretch, 'bulge', variables=[(self.default_prop_bone, 'volume_deform')])
 
+        # Rest
         if self.has_neck:
             orgs = self.bones.org[:-1]
-           
-            for args in zip(count(0), orgs):
-                self.rig_org_bone(*args, self.bones.mch.rot_neck)
-    
-    def rig_org_head_bone(self, org, tweak, next_tweak):
-        self.make_constraint(org, 'COPY_LOCATION', tweak)
-        self.make_constraint(org, 'COPY_SCALE', self.bones.ctrl.head)
-        self.make_constraint(org, 'DAMPED_TRACK', tweak)
-        stretch = self.make_constraint(org, 'STRETCH_TO', next_tweak)
-        self.make_driver(stretch, 'bulge', variables=[(self.bones.ctrl.master, 'volume_variation')])
-
-    def rig_org_bone(self, i, org, target):
-        ConnectingBendyRig.rig_org_bone(self, i, org, target)
+            for org, deform in zip(orgs, self.bones.deform):
+                self.make_constraint(org, 'COPY_TRANSFORMS', deform)
 
     ####################################################
     # Deform bones
@@ -252,9 +240,11 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
     @stage.generate_bones
     def make_deform_chain(self):
         # Optional head DEF
-        orgs = self.bones.org if self.create_head_def else self.bones.org[:-1]
-        self.bones.deform = map_list(self.make_deform_bone, count(0), orgs)
-        self.bbone_chain_length = len(self.bones.deform) - 1 - self.create_head_def
+        orgs = self.bones.org
+        self.bones.deform = map_list(self.make_deform_bone, count(0), orgs[:-1])
+        if self.create_head_def:
+            self.bones.deform_head = self.make_deform_bone(0, orgs[-1])
+        #self.bbone_chain_length = len(self.bones.deform) - 1 - self.create_head_def
 
     @stage.generate_bones
     def register_parent_bones(self):
@@ -263,27 +253,31 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
 
     @stage.parent_bones
     def parent_deform_chain(self):
-        ConnectingBendyRig.parent_deform_chain(self)
+        if self.has_neck:
+            ConnectingChainBendyRig.parent_deform_chain(self)
+            self.set_bone_parent(self.bones.deform[0], self.bones.ctrl.neck)
+        if self.create_head_def:
+            self.set_bone_parent(self.bones.deform_head, self.bones.deform[0] if self.has_neck else self.bones.ctrl.neck)
 
     @stage.parent_bones
-    def ease_deform_chain(self):
+    def bbone_deform_chain(self):
         if self.has_neck:
-            ConnectingBendyRig.ease_deform_chain(self)
+            ConnectingChainBendyRig.bbone_deform_chain(self)
 
     @stage.rig_bones
     def rig_deform_chain(self):
-        ctrl = self.bones.ctrl
+        ctrls = self.bones.ctrl
 
-        self.make_constraint(self.bones.deform[-1], 'COPY_TRANSFORMS', self.bones.org[-1])
+        if self.create_head_def:
+            self.make_constraint(self.bones.deform_head, 'COPY_TRANSFORMS', self.bones.org[-1])
 
         if self.has_neck:
-            deforms = self.bones.deform[:-1] if self.create_head_def else self.bones.deform
-            tweaks = self.bones.ctrl.tweak
-            for args in zip(count(0), deforms, tweaks, tweaks[1:]):
-                self.rig_deform_bone(*args, ctrl.neck)
-
-            for i, deform in zip(count(0), deforms):
-                self.drivers_deform_roll_bone(i, deform, len(self.bones.deform) - 1)
+            deforms = self.bones.deform
+            tweaks = ctrls.tweak
+            length = len(self.bones.deform)
+            for i, deform, tweak, next_tweak in zip(count(0), deforms, tweaks, tweaks[1:]):
+                ConnectingChainBendyRig.rig_deform_bone(self, deform, tweak, next_tweak, ctrls.neck)
+                self.drivers_deform_roll_bone(i, deform, length)
 
     def drivers_deform_roll_bone(self, i, deform, length):
         pbone = self.get_bone(deform)
@@ -340,8 +334,16 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
 
     @stage.configure_bones
     def configure_bbone_chain(self):
-        if self.create_head_def:
-            super().configure_bbone_chain()
+        pass
+
+    ####################################################
+    # UI
+
+    def head_def_ui(self, layout, params):
+        layout.row().prop(params, "create_head_def", toggle=True)
+
+    def neck_ui(self, layout, params):
+        layout.row().prop(params, "spine_end_to_neck", toggle=True)
 
     ####################################################
     # SETTINGS
@@ -359,12 +361,28 @@ class Rig(SuperHeadRig, ConnectingBendyRig):
             description='Create a deformation bone for the head itself'
         )
 
+        params.spine_end_to_neck = bpy.props.BoolProperty(
+            name='Attach Spine End to Neck',
+            default=True,
+            description="If parented to a spine, the spine's end tweak will follow this neck"
+        )
+
     @classmethod
     def parameters_ui(self, layout, params):
-        r = layout.row()
-        r.prop(params, "create_head_def", toggle=True)
-
-        ConnectingBendyRig.parameters_ui(layout, params)
+        box = layout.box()
+        self.head_def_ui(self, box, params)
+        self.base_ui(self, box, params)
+        if params.base_type == 'TWEAK':
+            self.neck_ui(self, box, params)
+        layout.row().prop(params, 'show_advanced')
+        if params.show_advanced:
+            box = layout.box()
+            #self.complex_stretch_ui(self, box, params)
+            self.rotation_mode_tweak_ui(self, box, params)
+            self.volume_ui(self, box, params)
+        box = layout.box()
+        self.bbones_ui(self, box, params)
+        ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 def create_sample(obj):
     # generated by rigify.utils.write_metarig

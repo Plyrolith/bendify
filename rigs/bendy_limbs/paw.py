@@ -21,7 +21,7 @@
 import bpy
 
 from rigify.rigs.limbs.paw import Rig as PawRig
-from .bendy_limb_rigs import BaseLimbBendyRig
+from .limb_bendy_rigs import BaseLimbBendyRig
 
 
 class Rig(BaseLimbBendyRig, PawRig):
