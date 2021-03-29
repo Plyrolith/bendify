@@ -51,7 +51,7 @@ class BENDIFY_OT_ReparentObjectsToBones(Operator):
         for obj in objs:
             if obj.parent_type == 'BONE' and obj.parent_bone \
             and obj.parent and obj.parent.name in context.view_layer.objects:
-                O.object.select_all(action='DESELECT')
+                bpy.ops.object.select_all(action='DESELECT')
 
                 parent = obj.parent
                 arma = parent.data
@@ -63,10 +63,10 @@ class BENDIFY_OT_ReparentObjectsToBones(Operator):
                 parent.select_set(True)
                 context.view_layer.objects.active = parent
 
-                O.object.parent_set(type='BONE_RELATIVE')
+                bpy.ops.object.parent_set(type='BONE_RELATIVE')
                 arma.layers = layers
         
-        O.object.select_all(action='DESELECT')
+        bpy.ops.object.select_all(action='DESELECT')
         for obj in objs:
             obj.select_set(True)
         context.view_layer.objects.active = act
@@ -174,7 +174,7 @@ class BENDIFY_OT_StretchToReset(Operator):
         return context.mode == 'POSE'
 
     def execute(self, context):
-        #O.constraint.stretchto_reset()
+        #bpy.ops.constraint.stretchto_reset()
 
         # Selection only
         if self.selected:
@@ -238,7 +238,7 @@ class BENDIFY_OT_ConstraintsMirror(Operator):
             obj = pb.id_data
             mb = mirror_bone(pb)
             if mb:
-                O.pose.select_all(action='DESELECT')
+                bpy.ops.pose.select_all(action='DESELECT')
                 obj.data.bones[pb.name].select = True
                 obj.data.bones[mb.name].select = True
 
@@ -247,7 +247,7 @@ class BENDIFY_OT_ConstraintsMirror(Operator):
                 obj.data.bones.active = obj.data.bones[givr.name]
 
                 if givr.constraints:
-                    O.pose.constraints_copy()
+                    bpy.ops.pose.constraints_copy()
 
                     # Fix sides for targets/subtargets
                     for c in rcvr.constraints:
@@ -261,7 +261,7 @@ class BENDIFY_OT_ConstraintsMirror(Operator):
                                     t.subtarget = mirror_name(t.subtarget) or t.subtarget
         
         # Restore selection and active bone
-        O.pose.select_all(action='DESELECT')
+        bpy.ops.pose.select_all(action='DESELECT')
         for bone_sel in pbones:
             bone_sel.id_data.data.bones[bone_sel.name].select = True
         if pb_active:
@@ -367,12 +367,12 @@ class BENDIFY_OT_ConstraintsAddArmature(Operator):
         # Clear parenting
         if self.parent_clear:
             try:
-                O.object.mode_set(mode='EDIT')
+                bpy.ops.object.mode_set(mode='EDIT')
                 for b in pairing:
                     if b.parent:
                         b.id_data.data.edit_bones[b.name].parent = None
                         b.id_data.update_from_editmode()
-                O.object.mode_set(mode='POSE')
+                bpy.ops.object.mode_set(mode='POSE')
             except:
                 print("Unparenting failed. Linked Armature Data?")
 
@@ -660,10 +660,10 @@ class BENDIFY_OT_MirrorAllWeights(Operator):
             i = v_groups.find(mirror)
             if i > -1:
                 v_groups.active_index = i
-                O.object.vertex_group_remove(all=False, all_unlocked=False)
+                bpy.ops.object.vertex_group_remove(all=False, all_unlocked=False)
             v_groups.active_index = vg.index
-            O.object.vertex_group_copy()
-            O.object.vertex_group_mirror(use_topology=False)
+            bpy.ops.object.vertex_group_copy()
+            bpy.ops.object.vertex_group_mirror(use_topology=False)
             v_groups[v_groups.active_index].name = mirror
         
         act = context.active_object
@@ -766,7 +766,7 @@ class BENDIFY_OT_DrawBlendSwitch(Operator):
         brush.use_paint_weight = True
 
         paint.brush = brush
-        O.wm.tool_set_by_id(name="builtin_brush.Draw")
+        bpy.ops.wm.tool_set_by_id(name="builtin_brush.Draw")
         if self.notify:
             self.report({'INFO'}, brush.name + " set to " + self.blend)
         return {"FINISHED"}
