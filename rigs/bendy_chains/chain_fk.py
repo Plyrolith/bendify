@@ -2,35 +2,23 @@ import bpy
 
 from rigify.utils.layers import ControlLayersOption
 
-from .chain_bendy_rigs import ComplexChainBendyRig, AlignedChainBendyRig, \
+from .chain_bendy_rigs import AlignedChainBendyRig, ParentedBendyChainRig, \
 ConnectingChainBendyRig, SegmentedChainBendyRig, MasterControlChainBendyRig
 
 class Rig(
     MasterControlChainBendyRig,
     SegmentedChainBendyRig,
-    ConnectingChainBendyRig,
-    AlignedChainBendyRig,
-    ComplexChainBendyRig
+    ParentedBendyChainRig,
+    ConnectingChainBendyRig
     ):
     """
-    Bendy tentacle
+    Bendy FK chain
     """
 
     @classmethod
     def parameters_ui(self, layout, params):
-        box = layout.box()
-        self.master_control_ui(self, box, params)
-        self.segmented_fk_ui(self, box, params)
-        layout.row().prop(params, 'show_advanced')
-        if params.show_advanced:
-            box = layout.box()
-            self.align_ui(self, box, params)
-            self.complex_stretch_ui(self, box, params)
-            self.rotation_mode_tweak_ui(self, box, params)
-            self.org_transform_ui(self, box, params)
-            self.volume_ui(self, box, params)
-        box = layout.box()
-        self.bbones_ui(self, box, params)
+        self.master_control_ui(layout, params)
+        self.segmented_fk_ui(layout, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 def create_sample(obj):
@@ -85,7 +73,7 @@ def create_sample(obj):
     pbone.rotation_mode = 'QUATERNION'
     pbone.bone.layers = [True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     try:
-        pbone.rigify_parameters.bbones_easeout = False
+        pbone.rigify_parameters.bbone_easeout = False
     except AttributeError:
         pass
     try:
@@ -93,7 +81,7 @@ def create_sample(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones_easein = True
+        pbone.rigify_parameters.bbone_easein = True
     except AttributeError:
         pass
     try:

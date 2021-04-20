@@ -34,6 +34,7 @@ offset_axes = (
     )
 
 class ArmaConstraintTargets(PropertyGroup):
+    props_options = {'LIBRARY_EDITABLE'}
     name: StringProperty(name="Bone Name", default="")
 
     weight: FloatProperty(
@@ -41,32 +42,37 @@ class ArmaConstraintTargets(PropertyGroup):
         default=0.0,
         min=0.0,
         max=1.0,
-        description="Constraint Weight"
+        description="Constraint Weight",
+        options=props_options
     )
 
     scale_offset: BoolProperty(
-        name="Copy Scale",
+        name="Offset Scale",
         default=False,
-        description="Get scale offset from this parent"
+        description="Get scale offset from this parent",
+        options=props_options
     )
 
     scale_source_x: EnumProperty(
         items=offset_axes,
         name="X Source Axis",
         default='SCALE_X',
-        description="Source axis for X scale base offset"
+        description="Source axis for X scale offset",
+        options=props_options
     )
 
     scale_source_y: EnumProperty(
         items=offset_axes,
         name="Y Source Axis",
         default='SCALE_Y',
-        description="Source axis for Y scale base offset"
+        description="Source axis for Y scale offset",
+        options=props_options
     )
 
     scale_source_z: EnumProperty(
         items=offset_axes,
         name="Z Source Axis",
         default='SCALE_Z',
-        description="Source axis for Z scale base offset"
+        description="Source axis for Z scale offset",
+        options=props_options
     )

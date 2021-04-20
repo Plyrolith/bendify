@@ -15,7 +15,7 @@ from rigify.rigs.widgets import create_gear_widget
 
 from .chain_bendy_rigs import ConnectingChainBendyRig
 
-from ...utils.bones import align_bone, real_bone
+from ...utils.bones import align_bone_between_bones
 from ...utils.misc import threewise_nozip
 
 
@@ -28,22 +28,19 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
         '''Don't use basic connection; bendy init, neck checks'''
         super().initialize()
         self.create_head_def = self.params.create_head_def
-        self.spine_end_to_neck = self.params.spine_end_to_neck
 
         # Deactivate
         self.use_connect_chain = False
         self.connected_tweak = None
-        self.tip = None
+        self.attach_tip = None
 
         ConnectingChainBendyRig.initialize(self)
 
-        self.base_mch = None
         self.long_neck = len(self.bones.org) > 3
         self.has_neck = len(self.bones.org) > 1
         self.rotation_bones = []
 
         self.bbone_handles = 'TANGENT'
-        self.org_transform = 'DEFORM'
 
     ####################################################
     # Main control bones  
@@ -77,28 +74,6 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
 
     def check_mch_targets(self):
         return threewise_nozip(self.check_mch_parents()[:-1])
-
-    ####################################################
-    # Attach Spine End to Neck
-
-    @stage.parent_bones
-    def check_base_tweak_mch(self):
-        parent_tweaks = self.attribute_return(['rigify_parent', 'bones', 'mch', 'tweak'], True)
-        if self.attribute_return(['rigify_parent', 'org_transform']) == 'FK' and self.spine_end_to_neck \
-        and self.base_connect and self.real_bone(self.base) and self.get_bone_parent(self.base) in parent_tweaks:
-            self.base_mch = self.get_bone_parent(self.base)
-
-    @stage.apply_bones
-    def parent_base_tweak(self):
-        if self.attribute_return(['rigify_parent', 'org_transform']) == 'FK' and self.spine_end_to_neck \
-        and self.real_bone(self.base) and self.get_bone_parent(self.base) and not self.base_mch:
-            self.set_bone_parent(self.base, self.bones.ctrl.neck if self.has_neck else self.bones.ctrl.head)
-    
-    @stage.finalize
-    def copy_location_base_tweak_mch(self):
-        if self.base_mch and self.has_neck and is_same_position(self.obj, self.base_mch, self.bones.ctrl.neck):
-            self.make_constraint(self.base_mch, 'COPY_LOCATION', self.bones.ctrl.neck)
-
 
     ####################################################
     # Tweak MCH chain
@@ -188,7 +163,7 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
     def generate_neck_tweak_widget(self):
         # Generate the widget early to override connected parent
         if self.long_neck:
-            bone = self.base if self.base_type == 'TWEAK' and self.real_bone(self.base) else self.bones.ctrl.tweak[0]
+            bone = self.attach_base if self.attach_base_type == 'TWEAK' and self.attach_base else self.bones.ctrl.tweak[0]
             create_neck_tweak_widget(self.obj, bone, size=1.0)
 
     ##############################
@@ -320,49 +295,24 @@ class Rig(SuperHeadRig, ConnectingChainBendyRig):
     ####################################################
     # UI
 
+    @classmethod
     def head_def_ui(self, layout, params):
         layout.row().prop(params, "create_head_def", toggle=True)
 
-    def neck_ui(self, layout, params):
-        layout.row().prop(params, "spine_end_to_neck", toggle=True)
-
     ####################################################
     # SETTINGS
-    
-    @stage.configure_bones
-    def configure_armature_display(self):
-        # New function to set rig viewport display
-        self.obj.data.display_type = 'BBONE'
 
     @classmethod
     def add_parameters(self, params):
         params.create_head_def = BoolProperty(
             name='Create head DEF',
             default=True,
-            description='Create a deformation bone for the head itself'
-        )
-
-        params.spine_end_to_neck = BoolProperty(
-            name='Attach Spine End to Neck',
-            default=True,
-            description="If parented to a spine, the spine's end tweak will follow this neck"
+            description='Create a deformation bone for the head itself',
         )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        box = layout.box()
-        self.head_def_ui(self, box, params)
-        self.base_ui(self, box, params)
-        if params.base_type == 'TWEAK':
-            self.neck_ui(self, box, params)
-        layout.row().prop(params, 'show_advanced')
-        if params.show_advanced:
-            box = layout.box()
-            #self.complex_stretch_ui(self, box, params)
-            self.rotation_mode_tweak_ui(self, box, params)
-            self.volume_ui(self, box, params)
-        box = layout.box()
-        self.bbones_ui(self, box, params)
+        self.head_def_ui(layout, params)
         ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 def create_sample(obj):

@@ -1309,11 +1309,11 @@ def create(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones_easein = False
+        pbone.rigify_parameters.bbone_easein = False
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones_easeout = True
+        pbone.rigify_parameters.bbone_easeout = True
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['spine.001']]

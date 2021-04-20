@@ -20,7 +20,6 @@ class Rig(SpineRig, ChainBendyRig):
         super().initialize()
         ChainBendyRig.initialize(self)
         self.rotation_mode_end = self.params.rotation_mode_end
-        self.org_transform = 'FK'
 
     ####################################################
     # Master control bone
@@ -107,14 +106,15 @@ class Rig(SpineRig, ChainBendyRig):
     ####################################################
     # UI
 
+    @classmethod
     def pivot_ui(self, layout, params):
         layout.row().prop(params, 'make_custom_pivot', toggle=True)
         layout.row().prop(params, 'pivot_pos', text="Pivot Position")
     
+    @classmethod
     def chest_hips_ui(self, layout, params):
         layout.row().prop(params, 'rotation_mode_end', text="Chest & Hips")
     
-
     ####################################################
     # SETTINGS
 
@@ -126,22 +126,13 @@ class Rig(SpineRig, ChainBendyRig):
             name='Default Chest & Hip Rotation Mode',
             items=self.rotation_modes,
             default='QUATERNION',
-            description='Default rotation mode for chest and hip control bones'
+            description='Default rotation mode for chest and hip control bones',
         )
     
     @classmethod
     def parameters_ui(self, layout, params):
-        box = layout.box()
-        self.pivot_ui(self, box, params)
-        self.chest_hips_ui(self, box, params)
-        layout.row().prop(params, 'show_advanced')
-        if params.show_advanced:
-            box = layout.box()
-            #self.complex_stretch_ui(self, box, params)
-            self.rotation_mode_tweak_ui(self, box, params)
-            self.volume_ui(self, box, params)
-        box = layout.box()
-        self.bbones_ui(self, box, params)
+        self.pivot_ui(layout, params)
+        self.chest_hips_ui(layout, params)
         ControlLayersOption.FK.parameters_ui(layout, params)
 
 
@@ -199,11 +190,11 @@ def create_sample(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones_easeout = True
+        pbone.rigify_parameters.bbone_easeout = True
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.bbones_easein = False
+        pbone.rigify_parameters.bbone_easein = False
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['spine.001']]

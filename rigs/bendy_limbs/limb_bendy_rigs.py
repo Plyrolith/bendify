@@ -7,7 +7,7 @@ from rigify.utils.naming import make_derived_name, strip_org
 from rigify.base_rig import stage
 from rigify.rigs.limbs.limb_rigs import BaseLimbRig
 
-from ...utils.bones import align_bone
+from ...utils.bones import align_bone_between_bones
 
 from itertools import count
 
@@ -53,6 +53,8 @@ class BaseLimbBendyRig(BaseLimbRig):
     #   DEF bones
     #
     ####################################################
+
+    props_options = {'LIBRARY_EDITABLE'}
 
     def initialize(self):
         # Bbone segments
@@ -181,13 +183,13 @@ class BaseLimbBendyRig(BaseLimbRig):
         self.set_bone_parent(tweak, mch)
         if not i == 0 and entry.seg_idx == 0:
             p, c, n = self.check_entry_targets(entry)
-            align_bone(self.obj, tweak, p, c, n)
+            align_bone_between_bones(self.obj, tweak, p, c, n)
 
     def rig_tweak_bone(self, i, tweak, entry):
         super().rig_tweak_mch_bone(i, tweak, entry)
         if not i == 0 and entry.seg_idx == 0:
             p, c, n = self.check_entry_targets(entry)
-            align_bone(self.obj, tweak, p, c, n)
+            align_bone_between_bones(self.obj, tweak, p, c, n)
 
     def configure_tweak_bone(self, i, tweak, entry):
         '''Completely unlocked tweak'''
@@ -201,7 +203,7 @@ class BaseLimbBendyRig(BaseLimbRig):
         super().parent_tweak_mch_bone(i, tweak, entry)
         if not i == 0 and entry.seg_idx == 0:
             p, c, n = self.check_entry_targets(entry)
-            align_bone(self.obj, tweak, p, c, n)
+            align_bone_between_bones(self.obj, tweak, p, c, n)
 
     @stage.rig_bones
     def rig_tweak_mch_chain(self):
@@ -538,21 +540,25 @@ class BaseLimbBendyRig(BaseLimbRig):
     ####################################################
     # UI
 
+    @classmethod
     def tweak_align(self, layout, params):
         r = layout.row(align=True)
         r.prop(params, "tweak_align_default", toggle=True)
         r.prop(params, "tweak_align_panel", text="", icon='OPTIONS')
 
+    @classmethod
     def ease(self, layout, params):
         r = layout.row(align=True)
         r.prop(params, "ease_in", toggle=True)
         r.prop(params, "ease_joints", toggle=True)
         r.prop(params, "ease_out", toggle=True)
 
+    @classmethod
     def rotation_modes(self, layout, params):
         layout.row().prop(params, "rotation_mode_ik", text="IK")
         layout.row().prop(params, "rotation_mode_tweak", text="Tweaks")
 
+    @classmethod
     def limb_volume_deform_ui(self, layout, params):
         r = layout.row(align=True)
         r.prop(params, 'limb_volume_deform_default', slider=True)
@@ -585,44 +591,44 @@ class BaseLimbBendyRig(BaseLimbRig):
             name        = 'Default IK Controller Rotation Mode',
             items       = rotation_modes,
             default     = 'QUATERNION',
-            description = 'Default rotation mode for IK control bones'
+            description = 'Default rotation mode for IK control bones',
         )
 
         params.rotation_mode_tweak = EnumProperty(
             name        = 'Default Tweak Controller Rotation Mode',
             items       = rotation_modes,
             default     = 'ZXY',
-            description = 'Default rotation mode for tweak control bones'
+            description = 'Default rotation mode for tweak control bones',
         )
 
         params.tweak_align_default = BoolProperty(
             name='Align Joints',
             default=True,
-            description='Align joint tweaks to interpolate between limb segments. This only affects the default, property can always be animated.'
+            description='Align joint tweaks to interpolate between limb segments. This only affects the default, property can always be animated.',
         )
 
         params.tweak_align_panel = BoolProperty(
             name='Align Joints Panel UI',
             default=False,
-            description='Add panel to control joint interpolation to the UI.'
+            description='Add panel to control joint interpolation to the UI.',
         )
 
         params.ease_in = BoolProperty(
             name='Bend In',
             default=False,
-            description='Make incoming joint bendy by default. Sets default ease for joint tweak to 1.'
+            description='Make incoming joint bendy by default. Sets default ease for joint tweak to 1.',
         )
 
         params.ease_joints = BoolProperty(
             name='Bend Joints',
             default=False,
-            description='Make main joints bendy by default. Sets default ease for joint tweaks to 1.'
+            description='Make main joints bendy by default. Sets default ease for joint tweaks to 1.',
         )
 
         params.ease_out = BoolProperty(
             name='Bend Out',
             default=False,
-            description='Make outgoing joint bendy by default. Sets default ease for joint tweak to 1.'
+            description='Make outgoing joint bendy by default. Sets default ease for joint tweak to 1.',
         )
 
         params.limb_volume_deform_default = FloatProperty(
@@ -630,19 +636,19 @@ class BaseLimbBendyRig(BaseLimbRig):
             default=1.0,
             soft_min=0.0,
             soft_max=1.0,
-            description="Default value for deform bone chain stretch volume variation"
+            description="Default value for deform bone chain stretch volume variation",
         )
 
         params.limb_volume_deform_panel = BoolProperty(
             name="Deform Volume Variation Panel",
             default=False,
-            description="Add panel to control volume variation to the UI"
+            description="Add panel to control volume variation to the UI",
         )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        self.tweak_align(self, layout, params)
-        self.limb_volume_deform_ui(self, layout, params)
-        self.ease(self, layout, params)
-        self.rotation_modes(self, layout, params)
+        self.tweak_align(layout, params)
+        self.limb_volume_deform_ui(layout, params)
+        self.ease(layout, params)
+        self.rotation_modes(layout, params)
         super().parameters_ui(layout, params)

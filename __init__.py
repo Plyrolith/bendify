@@ -1,6 +1,7 @@
 rigify_info = {
     "name": "Bendify",
-    "link": "https://github.com/Plyrolith/bendify"
+    "link": "https://github.com/Plyrolith/bendify",
+    "version": (0, 2, 0)
 }
 
 from bpy.utils import register_class, unregister_class
@@ -13,6 +14,7 @@ from .tools_ops import *
 from .tools_ui import *
 from .widgets_ops import *
 from .widgets_ui import *
+from .rigify_ops import *
 from .rigify_ui import *
 from .props import BendifySceneSettings, ArmaConstraintTargets
 
@@ -40,6 +42,8 @@ classes = (
     BENDIFY_OT_WidgetsNamesFix,
     BENDIFY_OT_WidgetsRemoveUnused,
     BENDIFY_OT_AddBoneGroups,
+    BENDIFY_OT_RigifyBendifyParentAdd,
+    BENDIFY_OT_RigifyBendifyParentRemove,
     BENDIFY_PT_ArmatureLayerManagerViewport,
     BENDIFY_PT_BoneGroups,
     BENDIFY_PT_BoneType,
@@ -48,7 +52,11 @@ classes = (
     BENDIFY_PT_BendifyToolsObject,
     BENDIFY_PT_BendifyToolsWeightPaint,
     BENDIFY_PT_BendifyWidgets,
+    BENDIFY_PT_BoneBBones,
+    BENDIFY_PT_TweakAttach,
     BENDIFY_PT_BoneParents,
+    BONE_PT_BoneBBones,
+    BONE_PT_TweakAttach,
     BONE_PT_BoneParents,
     BendifySceneSettings,
     ArmaConstraintTargets

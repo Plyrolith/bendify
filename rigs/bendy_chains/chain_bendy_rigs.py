@@ -10,8 +10,8 @@ from rigify.utils.bones import align_bone_orientation, align_bone_roll, align_bo
 from rigify.utils.widgets_basic import create_bone_widget
 from rigify.rigs.widgets import create_ballsocket_widget
 
-from ...bendy_rigs import HandleBendyRig, ComplexBendyRig, AlignedBendyRig, ConnectingBendyRig
-from ...utils.bones import align_bone_to_bone_axis, align_bone, distance, real_bone
+from ...bendy_rigs import HandleBendyRig, AlignedBendyRig, ConnectingBendyRig, ParentedBendyRig
+from ...utils.bones import align_bone_between_bones, align_bone_to_bone_axis, distance
 from ...utils.misc import threewise_nozip
 
 
@@ -22,7 +22,6 @@ class ChainBendyRig(HandleBendyRig):
 
     def initialize(self):
         super().initialize()
-        self.org_transform = self.params.org_transform_fk
 
     ##############################
     # Control chain
@@ -37,8 +36,8 @@ class ChainBendyRig(HandleBendyRig):
 
     @stage.parent_bones
     def parent_control_chain(self):
-        self.parent_bone_chain(self.bones.ctrl.fk, use_connect=False)
-        self.set_bone_parent(self.bones.ctrl.fk[0], self.root_bone)
+        self.parent_bone_chain(self.bones.ctrl.fk, use_connect=False, inherit_scale='FIX_SHEAR')
+        self.set_bone_parent(self.bones.ctrl.fk[0], self.root_bone, inherit_scale='FIX_SHEAR')
 
     @stage.configure_bones
     def configure_control_chain(self):
@@ -57,14 +56,15 @@ class ChainBendyRig(HandleBendyRig):
         create_bone_widget(self.obj, ctrl)
 
     ####################################################
-    # Tweak Targets
+    # Tweak MCH chain
 
-    def check_mch_parents(self):
-        fks = self.bones.ctrl.fk
-        return fks + fks[-1:]
-
-    def check_mch_targets(self):
-        return threewise_nozip(self.check_mch_parents())
+    @stage.rig_bones
+    def rig_tweak_mch_chain(self):
+        if self.tweak_mch:
+            orgs = self.bones.org
+            for mch, org in zip(self.bones.mch.tweak, orgs + [orgs[-1]]):
+                self.make_armature_constraint(mch, org)
+                self.make_constraint(mch, 'COPY_SCALE', self.root_bone)
 
     ####################################################
     # Tweak chain
@@ -75,29 +75,37 @@ class ChainBendyRig(HandleBendyRig):
         orgs = self.bones.org
         self.bones.ctrl.tweak = map_list(self.make_tweak_bone, count(0), orgs + orgs[-1:])
 
+    @stage.parent_bones
+    def parent_tweak_chain(self):
+        ctrls = self.bones.ctrl
+        parents = self.bones.mch.tweak if self.bbone_handles == 'TANGENT' else ctrls.fk + [ctrls.fk[-1]]
+        for args in zip(ctrls.tweak, parents):
+            self.parent_tweak_bone(*args)
+
     @stage.configure_bones
     def configure_tweak_chain(self):
-        tweaks = self.bones.ctrl.tweak
-        for args in zip(count(0), tweaks):
-            self.configure_tweak_bone(*args)
-
-        ControlLayersOption.TWEAK.assign(self.params, self.obj, tweaks)
+        super().configure_tweak_chain()
+        ControlLayersOption.TWEAK.assign(self.params, self.obj, self.bones.ctrl.tweak)
 
     ##############################
     # ORG chain
     
+    @stage.apply_bones
+    def bbone_org_chain(self):       
+        orgs = self.bones.org
+        fks = self.bones.ctrl.fk
+        self.ease_org_chain(orgs)
+        self.bbone_chain(
+            orgs,
+            fks[0] if self.bbone_handles == 'TANGENT' else None,
+            fks[-1] if self.bbone_handles == 'TANGENT' else None
+        )
+
     @stage.rig_bones
     def rig_org_chain(self):
-        ctrls = self.bones.ctrl
-        for args in zip(self.bones.org, self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
-            self.rig_org_bone(*args)
-            
-    def rig_org_bone(self, org, deform, tweak, next_tweak, fk):
-        if self.org_transform == 'FK':
-            self.make_constraint(org, 'COPY_TRANSFORMS', fk)
-        else:
-            super().rig_org_bone(org, deform, tweak, next_tweak)
-
+        fks = self.bones.ctrl.fk
+        for org, fk, next_fk in zip(self.bones.org, fks, fks[1:] + [None]):
+            self.rig_org_bone(org, fk, next_fk, fk)
 
     ####################################################
     # Deform bones
@@ -105,56 +113,19 @@ class ChainBendyRig(HandleBendyRig):
     @stage.rig_bones
     def rig_deform_chain(self):
         ctrls = self.bones.ctrl
-        for args in zip(self.bones.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
+        rots = ctrls.tweak if not self.bbone_handles == 'NONE' else len(ctrls.tweak) * [None]
+        for args in zip(self.bones.deform, ctrls.tweak, ctrls.tweak[1:], rots):
             self.rig_deform_bone(*args)
-
-    ####################################################
-    # UI
-    
-    def org_transform_ui(self, layout, params):
-        layout.row().prop(params, 'org_transform_fk', text="ORGs")
-
-    ####################################################
-    # SETTINGS
-
-    @classmethod
-    def add_parameters(self, params):
-        params.org_transform_fk = EnumProperty(
-            name="ORG Transform base",
-            items=(
-                ('FK', "FK Controls", "FK Controls"),
-                ('DEF', "Deforms", "Deforms"),
-                ('TWEAK', "Single Tweak", "Single Tweak"),
-                ('TWEAKS', "Between Tweaks", "BetweenTweaks")
-            ),
-            default='FK',
-            description="Source of ORG transformation; useful to determine children's behaviour"
-        )  
-
-    @classmethod
-    def parameters_ui(self, layout, params):
-        super().parameters_ui(layout, params)
-        ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 
 ### Combine from the following:
 
 # Frankensteined classes
 
-class ComplexChainBendyRig(ComplexBendyRig, ChainBendyRig):
+class ParentedBendyChainRig(ParentedBendyRig, ChainBendyRig):
     """
-    Bendy chain rig with copied stretch constraints for better non-uniform scalability
+    Stretchy chain rig with armature constrained handles
     """
-
-    ##############################
-    # Deform MCH
-
-    @stage.rig_bones
-    def rig_deform_mch_chain(self):
-        if self.complex_stretch:
-            ctrls = self.bones.ctrl
-            for args in zip(count(0), self.bones.mch.deform, ctrls.tweak, ctrls.tweak[1:], ctrls.fk):
-                self.rig_deform_mch_bone(*args)
 
 
 class AlignedChainBendyRig(AlignedBendyRig, ChainBendyRig):
@@ -248,7 +219,7 @@ class SegmentedChainBendyRig(ChainBendyRig):
             mchs = self.bones.mch
             for mch, target, fk in zip(mchs.fk, mchs.fktarget, self.bones.ctrl.fk[1:]):
                 self.make_constraint(mch, 'COPY_LOCATION', target)
-                rotation = self.make_constraint(mch, 'COPY_ROTATION', target, space='CUSTOM', space_object=self.obj, space_subtarget=self.root_bone)
+                rotation = self.make_constraint(mch, 'COPY_ROTATION', target)#, space='CUSTOM', space_object=self.obj, space_subtarget=self.root_bone)
                 self.make_driver(rotation, 'influence', variables=[(self.default_prop_bone, 'rotation_follow_' + fk)])
 
     ####################################################
@@ -274,18 +245,18 @@ class SegmentedChainBendyRig(ChainBendyRig):
     ####################################################
     # UI
 
+    @classmethod
     def segmented_fk_ui(self, layout, params):
         split = layout.split(align=True)
         split.row(align=True).prop(params, "segmented_fk", toggle=True)
-        r = split.row(align=True)
-        r.row(align=True).prop(params, "segmented_align", toggle=True)
+        r_align = split.row(align=True)
+        r_align.row(align=True).prop(params, "segmented_align", toggle=True)
+        r_follow = layout.row(align=True)
+        r_follow.prop(params, "segmented_rotation_follow_default", slider=True)
+        r_follow.prop(params, "segmented_rotation_follow_panel", text="", icon='OPTIONS')
         if not params.segmented_fk:
-            r.enabled = False
-        if params.segmented_fk:
-            r = layout.row(align=True)
-            r.prop(params, "segmented_rotation_follow_default", slider=True)
-            r.prop(params, "segmented_rotation_follow_panel", text="", icon='OPTIONS')
-
+            r_align.enabled = r_follow.enabled = False
+    
     ####################################################
     # SETTINGS
 
@@ -296,33 +267,33 @@ class SegmentedChainBendyRig(ChainBendyRig):
         params.segmented_fk = BoolProperty(
             name="Segmented FK",
             description="Isolate FK controller scaling",
-            default=False
+            default=False,
             )
         
         params.segmented_align = BoolProperty(
             name="Align Segments",
             description="Align segment scaling by default for better control; may result in unexprected master scaling behavior",
-            default=True
+            default=True,
             )
 
         params.segmented_rotation_follow_default = FloatProperty(
-            name="Rotation Follow Default",
+            name="Segment Rotation Follow Default",
             default=1.0,
             min=0.0,
             max=1.0,
-            description="Default rotation follow per segment"
+            description="Default rotation follow per segment",
         )
 
         params.segmented_rotation_follow_panel = BoolProperty(
             name="Rotation Follow Panel",
             default=False,
-            description="Add panel to control rotation follow to the UI"
+            description="Add panel to control rotation follow to the UI",
         )
 
 
     @classmethod
     def parameters_ui(self, layout, params):
-        self.segmented_fk_ui(self, layout, params)
+        self.segmented_fk_ui(layout, params)
         super().parameters_ui(layout, params)
 
 
@@ -388,6 +359,7 @@ class MasterControlChainBendyRig(ChainBendyRig):
     ####################################################
     # UI
 
+    @classmethod
     def master_control_ui(self, layout, params):
         split = layout.row(align=True).split(align=True)
         split.row(align=True).prop(params, "master_control", toggle=True)
@@ -415,24 +387,24 @@ class MasterControlChainBendyRig(ChainBendyRig):
         )
 
         params.master_rotation_mode = EnumProperty(
-            name="Default Master Control Rotation Mode",
+            name="Master Control Rotation Mode",
             items=rotation_modes,
             default='XYZ',
-            description="Default rotation mode for master control"
+            description="Default rotation mode for master control",
         )
 
         params.master_control = BoolProperty(
             name="Master Control",
             description="Add master controller for the whole chain",
-            default=False
+            default=False,
             )
 
     @classmethod
     def parameters_ui(self, layout, params):
-        self.master_control_ui(self, layout, params)
+        self.master_control_ui(layout, params)
         super().parameters_ui(layout, params)
 
-
+# NEEDS REMOVAL
 class RotMechChainBendyRig(ChainBendyRig):
     """
     Connecting Bendy rig that can copy or cancel its parent's rotation.
